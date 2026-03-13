@@ -1,16 +1,37 @@
-# React + Vite
+# 🌊 wavelength
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> find your people nearby
 
-Currently, two official plugins are available:
+you can be surrounded by hundreds of people and still feel completely alone. wavelength anonymously matches you with people nearby based on shared interests, music, and shows. you see a compatibility score. if you both connect, you match. if not, nobody knows.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## how it works
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. set up your profile with interests, music, and shows
+2. join a room using a shared code with people around you
+3. see real time compatibility scores for everyone nearby
+4. tap connect, if they tap back, you match
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## stack
+
+React + Vite, Firebase (Firestore + Anonymous Auth), Framer Motion, Three.js
+
+---
+
+## run it locally
+
+```bash
+git clone https://github.com/yourusername/wavelength.git
+cd wavelength
+npm install
+npm run dev
+```
+
+add your Firebase config to `.env.local` (see `.env.example`).
+
+---
+
+built in 24 hours at [hackathon name] 💙
