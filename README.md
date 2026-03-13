@@ -17,15 +17,15 @@ you can be surrounded by hundreds of people and still feel completely alone. wav
 
 ## stack
 
-frontend:</br>
+frontend:
 React, Vite, Framer Motion, Three.js, Plus Jakarta Sans, PWA (vite-plugin-pwa)</br>
-backend:</br>
+backend:
 Firebase Firestore, Firebase Anonymous Auth, geofire-common (geohashing)</br>
-AI / ML:</br>
+AI / ML:
 Groq API (LLaMA 3.3 70B), real-time LLM inference, dynamic interest taxonomy generation, vector embeddings (coming), cosine similarity matching (coming)</br>
 security: (thinking about it)</br>
 Web Crypto API, cryptographic commitment scheme (coming), zero-knowledge mutual reveal (coming)</br>
-tools:</br>
+tools:
 Vite, Vercel, Git, GitHub, Postman</br>
 
 ---
