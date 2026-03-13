@@ -33,5 +33,4 @@ npm run dev
 add your Firebase config to `.env.local` (see `.env.example`).
 
 ---
-
-built in 24 hours at [hackathon name] 💙
+💙
