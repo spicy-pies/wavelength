@@ -91,7 +91,7 @@ export default function MatchList({ user, profile, room }) {
   return (
     <div className="screen">
       <div className="match-header-top">
-        <h1>👋 wavelength</h1>
+        <h1>Wavelength</h1>
         <span className="room-badge">{room}</span>
       </div>
       <p className="subtitle">
