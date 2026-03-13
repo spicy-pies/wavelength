@@ -79,7 +79,7 @@ export default function MatchList({ user, profile, room }) {
       (snap) => {
         const others = snap.docs
           .map(d => d.data())
-          .filter(m => m.uid !== user.uid && m.visible)
+          .filter(m => m.uid !== user.uid && m.visible && calcCompatibility(profile, m).score >= 50)
           .map(m => ({ ...m, ...calcCompatibility(profile, m) }))
           .sort((a, b) => b.score - a.score)
         setMembers(others)
