@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { doc, setDoc } from "firebase/firestore"
 import { db } from "../firebase"
+import { getEmbedding } from "../utils/embeddings"
 import Groq from "groq-sdk"
 
 const groq = new Groq({
@@ -139,76 +140,80 @@ function TagSelector({ label, options, selected, onChange, drillDownOptions, set
 }
 
 export default function ProfileSetup({ user, onDone }) {
-  const [name, setName] = useState("")
-  const [interests, setInterests] = useState([])
-  const [music, setMusic] = useState([])
-  const [shows, setShows] = useState([])
-  const [loading, setLoading] = useState(false)
+    const [name, setName] = useState("")
+    const [interests, setInterests] = useState([])
+    const [music, setMusic] = useState([])
+    const [shows, setShows] = useState([])
+    const [loading, setLoading] = useState(false)
 
-  const [interestDrillDown, setInterestDrillDown] = useState({})
-  const [musicDrillDown, setMusicDrillDown] = useState({})
-  const [showsDrillDown, setShowsDrillDown] = useState({})
-  const [loadingTag, setLoadingTag] = useState(null)
+    const [interestDrillDown, setInterestDrillDown] = useState({})
+    const [musicDrillDown, setMusicDrillDown] = useState({})
+    const [showsDrillDown, setShowsDrillDown] = useState({})
+    const [loadingTag, setLoadingTag] = useState(null)
 
-  const handleSubmit = async () => {
+    const handleSubmit = async () => {
     if (!name.trim() || interests.length === 0) return alert("Add a name and at least one interest!")
     setLoading(true)
-    const profile = { name, interests, music, shows, uid: user.uid }
-    await setDoc(doc(db, "users", user.uid), profile)
-    onDone(profile)
-  }
 
-  return (
-    <div className="screen">
-      <h1>wavelength</h1>
-      <p className="subtitle">tell us what you're into</p>
+        const allInterests = [...interests, ...music, ...shows]
+        const vector = await getEmbedding(allInterests)
 
-      <div className="section">
-        <h3>your name</h3>
-        <input
-          className="input"
-          placeholder="what do people call you?"
-          value={name}
-          onChange={e => setName(e.target.value)}
+        const profile = { name, interests, music, shows, vector, uid: user.uid }
+        await setDoc(doc(db, "users", user.uid), profile)
+        onDone(profile)
+    }
+
+    return (
+        <div className="screen">
+        <h1>wavelength</h1>
+        <p className="subtitle">tell us what you're into</p>
+
+        <div className="section">
+            <h3>your name</h3>
+            <input
+            className="input"
+            placeholder="what do people call you?"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            />
+        </div>
+
+        <TagSelector
+            label="Interests"
+            options={BROAD_INTERESTS}
+            selected={interests}
+            onChange={setInterests}
+            drillDownOptions={interestDrillDown}
+            setDrillDownOptions={setInterestDrillDown}
+            loadingTag={loadingTag}
+            setLoadingTag={setLoadingTag}
         />
-      </div>
 
-      <TagSelector
-        label="Interests"
-        options={BROAD_INTERESTS}
-        selected={interests}
-        onChange={setInterests}
-        drillDownOptions={interestDrillDown}
-        setDrillDownOptions={setInterestDrillDown}
-        loadingTag={loadingTag}
-        setLoadingTag={setLoadingTag}
-      />
+        <TagSelector
+            label="Music"
+            options={BROAD_MUSIC}
+            selected={music}
+            onChange={setMusic}
+            drillDownOptions={musicDrillDown}
+            setDrillDownOptions={setMusicDrillDown}
+            loadingTag={loadingTag}
+            setLoadingTag={setLoadingTag}
+        />
 
-      <TagSelector
-        label="Music"
-        options={BROAD_MUSIC}
-        selected={music}
-        onChange={setMusic}
-        drillDownOptions={musicDrillDown}
-        setDrillDownOptions={setMusicDrillDown}
-        loadingTag={loadingTag}
-        setLoadingTag={setLoadingTag}
-      />
+        <TagSelector
+            label="Shows & Film"
+            options={BROAD_SHOWS}
+            selected={shows}
+            onChange={setShows}
+            drillDownOptions={showsDrillDown}
+            setDrillDownOptions={setShowsDrillDown}
+            loadingTag={loadingTag}
+            setLoadingTag={setLoadingTag}
+        />
 
-      <TagSelector
-        label="Shows & Film"
-        options={BROAD_SHOWS}
-        selected={shows}
-        onChange={setShows}
-        drillDownOptions={showsDrillDown}
-        setDrillDownOptions={setShowsDrillDown}
-        loadingTag={loadingTag}
-        setLoadingTag={setLoadingTag}
-      />
-
-      <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
-        {loading ? "saving..." : "find my wavelength →"}
-      </button>
-    </div>
-  )
+        <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
+            {loading ? "saving..." : "find my wavelength →"}
+        </button>
+        </div>
+    )
 }
