@@ -23,10 +23,9 @@ backend:
 Firebase Firestore, Firebase Anonymous Auth, geofire-common (geohashing)</br>
 AI / ML:
 Groq API (LLaMA 3.3 70B), real-time LLM inference, dynamic interest taxonomy generation, vector embeddings (coming), cosine similarity matching (coming)</br>
-security: (thinking about it)</br>
+security (thinking about it): 
 Web Crypto API, cryptographic commitment scheme (coming), zero-knowledge mutual reveal (coming)</br>
-tools:
-Vite, Vercel, Git, GitHub, Postman</br>
+tools: Vite, Vercel, Git, GitHub, Postman</br>
 
 ---
 
