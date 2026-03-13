@@ -9,7 +9,7 @@ you can be surrounded by hundreds of people and still feel completely alone. wav
 ## how it works
 
 1. set up your profile with interests, music, and shows
-2. join a room using a shared code with people around you
+2. join a room using a shared code with people around you (for now, will integrate geographically matching ppl soon)
 3. see real time compatibility scores for everyone nearby
 4. tap connect, if they tap back, you match
 
@@ -18,7 +18,7 @@ you can be surrounded by hundreds of people and still feel completely alone. wav
 ## stack
 
 frontend:
-React, Vite, Framer Motion, Three.js, Plus Jakarta Sans, PWA (vite-plugin-pwa)</br>
+React, Vite, Framer Motion, Three.js, PWA (vite-plugin-pwa)</br>
 backend:
 Firebase Firestore, Firebase Anonymous Auth, geofire-common (geohashing)</br>
 AI / ML:
