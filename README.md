@@ -23,7 +23,4 @@ React + Vite, Firebase (Firestore + Anonymous Auth), Framer Motion, Three.js
 
 ## will deploy it soon
 
-add your Firebase config to `.env.local` (see `.env.example`).
-
----
 💙
