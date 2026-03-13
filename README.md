@@ -8,7 +8,7 @@ you can be surrounded by hundreds of people and still feel completely alone. wav
 
 ## how it works
 
-1. set up your profile with interests, music, and shows
+1. set up your profile with interests, music, and shows (can make it more advanced soon)
 2. join a room using a shared code with people around you (for now, will integrate geographically matching ppl soon)
 3. see real time compatibility scores for everyone nearby
 4. tap connect, if they tap back, you match
