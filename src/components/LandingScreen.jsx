@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { useEffect, useRef } from "react"
+import { motion } from "framer-motion"
 import * as THREE from "three"
 
 function GlobeCanvas() {
@@ -18,24 +18,19 @@ function GlobeCanvas() {
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000)
     camera.position.z = 2.5
 
-    // dotted globe
     const geometry = new THREE.SphereGeometry(1, 64, 64)
     const positions = geometry.attributes.position
     const dotGeo = new THREE.BufferGeometry()
     const dotPositions = []
 
     for (let i = 0; i < positions.count; i += 2) {
-      dotPositions.push(
-        positions.getX(i),
-        positions.getY(i),
-        positions.getZ(i)
-      )
+      dotPositions.push(positions.getX(i), positions.getY(i), positions.getZ(i))
     }
 
     dotGeo.setAttribute("position", new THREE.Float32BufferAttribute(dotPositions, 3))
 
     const dotMat = new THREE.PointsMaterial({
-      color: 0xa78bfa,
+      color: 0x38bdf8,
       size: 0.015,
       transparent: true,
       opacity: 0.8,
@@ -44,7 +39,6 @@ function GlobeCanvas() {
     const dots = new THREE.Points(dotGeo, dotMat)
     scene.add(dots)
 
-    // subtle equator ring
     const ringGeo = new THREE.TorusGeometry(1, 0.003, 16, 100)
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.2 })
     const ring = new THREE.Mesh(ringGeo, ringMat)
@@ -76,9 +70,10 @@ function Ripple({ delay }) {
       style={{
         position: "absolute",
         borderRadius: "50%",
-        border: "1px solid rgba(167, 139, 250, 0.4)",
+        border: "1px solid rgba(56, 189, 248, 0.3)",
         width: 300,
         height: 300,
+        pointerEvents: "none",
       }}
       initial={{ scale: 1, opacity: 0.6 }}
       animate={{ scale: 2.5, opacity: 0 }}
@@ -88,13 +83,6 @@ function Ripple({ delay }) {
 }
 
 export default function LandingScreen({ onEnter }) {
-  const [ready, setReady] = useState(false)
-
-  useEffect(() => {
-    const t = setTimeout(() => setReady(true), 1500)
-    return () => clearTimeout(t)
-  }, [])
-
   return (
     <div style={{
       display: "flex",
@@ -102,52 +90,53 @@ export default function LandingScreen({ onEnter }) {
       alignItems: "center",
       justifyContent: "center",
       height: "100vh",
-      background: "#0f0f1a",
+      background: "var(--bg)",
       gap: "2rem",
       overflow: "hidden",
+      position: "relative",
     }}>
-      {/* ripples + globe */}
-      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+
+      <div style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+      }}>
         <Ripple delay={0} />
         <Ripple delay={0.8} />
         <Ripple delay={1.6} />
         <GlobeCanvas />
       </div>
 
-      {/* title */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.3 }}
         style={{ textAlign: "center" }}
       >
-        <h1 style={{ fontSize: "2.5rem", color: "#a78bfa", fontWeight: 700 }}>wavelength</h1>
-        <p style={{ color: "#666", marginTop: "0.5rem" }}>find your people nearby</p>
+        <h1 style={{ fontSize: "2.5rem", color: "var(--purple)", fontWeight: 700 }}>wavelength</h1>
+        <p style={{ color: "var(--muted)", marginTop: "0.5rem" }}>Find your people nearby</p>
       </motion.div>
 
-      {/* CTA */}
-      <AnimatePresence>
-        {ready && (
-          <motion.button
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            onClick={onEnter}
-            style={{
-              padding: "0.9rem 2.5rem",
-              background: "#a78bfa",
-              color: "#fff",
-              border: "none",
-              borderRadius: "999px",
-              fontSize: "1rem",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            find my wavelength →
-          </motion.button>
-        )}
-      </AnimatePresence>
+      <button
+        onClick={onEnter}
+        style={{
+          padding: "0.9rem 2.5rem",
+          background: "var(--purple)",
+          color: "#fff",
+          border: "none",
+          borderRadius: "999px",
+          fontSize: "1rem",
+          fontWeight: 600,
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          cursor: "pointer",
+          position: "relative",
+          zIndex: 10,
+        }}
+      >
+        find my wavelength →
+      </button>
     </div>
   )
 }
