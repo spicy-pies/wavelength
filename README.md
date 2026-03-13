@@ -21,14 +21,7 @@ React + Vite, Firebase (Firestore + Anonymous Auth), Framer Motion, Three.js
 
 ---
 
-## run it locally
-
-```bash
-git clone https://github.com/yourusername/wavelength.git
-cd wavelength
-npm install
-npm run dev
-```
+## will deploy it soon
 
 add your Firebase config to `.env.local` (see `.env.example`).
 
