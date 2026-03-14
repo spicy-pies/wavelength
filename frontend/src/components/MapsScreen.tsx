@@ -15,53 +15,18 @@ export interface NearbyUser {
 
 // ─── HARDCODED CENTER (Sydney CBD) ───────────────────────────────────────────
 // TODO: replace with real geolocation when backend is ready
-const HARDCODED_CENTER = { lat: -33.8688, lng: 151.2093 };
+const HARDCODED_CENTER = { lat: -33.8748, lng: 151.2000 };
 
 // ─── HARDCODED NEARBY USERS ───────────────────────────────────────────────────
 // TODO: replace with real kNN results from backend
 const HARDCODED_USERS: NearbyUser[] = [
-  {
-    uid: "user-1",
-    similarity: 0.88,
-    lat: -33.8608, lng: 151.1981,
-    sharedInterests: ["Radiohead", "Elden Ring", "Succession"],
-  },
-  {
-    uid: "user-2",
-    similarity: 0.72,
-    lat: -33.8748, lng: 151.1949,
-    sharedInterests: ["Bon Iver", "Hollow Knight", "The Bear"],
-  },
-  {
-    uid: "user-3",
-    similarity: 0.81,
-    lat: -33.8648, lng: 151.2253,
-    sharedInterests: ["Frank Ocean", "Disco Elysium", "Fleabag"],
-  },
-  {
-    uid: "user-4",
-    similarity: 0.54,
-    lat: -33.8788, lng: 151.2173,
-    sharedInterests: ["Tame Impala", "Stardew Valley", "Atlanta"],
-  },
-  {
-    uid: "user-5",
-    similarity: 0.69,
-    lat: -33.8558, lng: 151.2143,
-    sharedInterests: ["Mitski", "Hades", "Severance"],
-  },
-  {
-    uid: "user-6",
-    similarity: 0.46,
-    lat: -33.8738, lng: 151.2063,
-    sharedInterests: ["James Blake", "Celeste", "Skins"],
-  },
-  {
-    uid: "user-7",
-    similarity: 0.63,
-    lat: -33.8778, lng: 151.2273,
-    sharedInterests: ["FKA Twigs", "Outer Wilds", "Twin Peaks"],
-  },
+  { uid: "user-1", similarity: 0.88, lat: -33.8608, lng: 151.1981, sharedInterests: ["Radiohead", "Elden Ring", "Succession"] },
+  { uid: "user-2", similarity: 0.72, lat: -33.8748, lng: 151.1749, sharedInterests: ["Bon Iver", "Hollow Knight", "The Bear"] },
+  { uid: "user-3", similarity: 0.81, lat: -33.8548, lng: 151.2253, sharedInterests: ["Frank Ocean", "Disco Elysium", "Fleabag"] },
+  { uid: "user-4", similarity: 0.54, lat: -33.8988, lng: 151.2173, sharedInterests: ["Tame Impala", "Stardew Valley", "Atlanta"] },
+  { uid: "user-5", similarity: 0.69, lat: -33.8558, lng: 151.1943, sharedInterests: ["Mitski", "Hades", "Severance"] },
+  { uid: "user-6", similarity: 0.46, lat: -33.8938, lng: 151.1963, sharedInterests: ["James Blake", "Celeste", "Skins"] },
+  { uid: "user-7", similarity: 0.63, lat: -33.8878, lng: 151.2273, sharedInterests: ["FKA Twigs", "Outer Wilds", "Twin Peaks"] },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -201,14 +166,14 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
     const L = (window as any).L;
 
     const map = L.map(mapRef.current, {
-      center: [HARDCODED_CENTER.lat, HARDCODED_CENTER.lng],
-      zoom: 15,
-      zoomControl: false,
-      attributionControl: false,
+        center: [HARDCODED_CENTER.lat, HARDCODED_CENTER.lng],
+        zoom: 17,
+        zoomControl: false,
+        attributionControl: false,
     });
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
     }).addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -289,40 +254,44 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
         iconAnchor: [26, 26],
       });
 
-      const marker = L.marker([user.lat, user.lng], { icon: heartIcon });
-      marker._wavelengthMarker = true;
-      marker.on("click", () => setSelectedUser(user));
-      marker.addTo(map);
+        const marker = L.marker([user.lat, user.lng], { icon: heartIcon });
+        marker._wavelengthMarker = true;
+        marker.on("click", () => setSelectedUser(user));
+        marker.addTo(map);
 
       // Draw red string from center to heart
-      const from = getLayerPoint(HARDCODED_CENTER.lat, HARDCODED_CENTER.lng);
-      const to = getLayerPoint(user.lat, user.lng);
+        const from = getLayerPoint(HARDCODED_CENTER.lat, HARDCODED_CENTER.lng);
+        const to = getLayerPoint(user.lat, user.lng);
 
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", String(from.x));
-      line.setAttribute("y1", String(from.y));
-      line.setAttribute("x2", String(to.x));
-      line.setAttribute("y2", String(to.y));
-      line.setAttribute("stroke", fill);
-      line.setAttribute("stroke-width", "1.2");
-      line.setAttribute("stroke-opacity", String(0.35 + user.similarity * 0.45));
-      svg.appendChild(line);
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const cx = (from.x + to.x) / 2 - dy * 0.25;
+        const cy = (from.y + to.y) / 2 + dx * 0.25;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "#C0392B");
+        path.setAttribute("stroke-width", "1.2");
+        path.setAttribute("stroke-opacity", String(0.3 + user.similarity * 0.4));
+        svg.appendChild(path);
     });
 
     // Keep strings locked on pan/zoom
     function onMoveUpdate() {
-      if (!svgOverlayRef.current) return;
-      const lines = svgOverlayRef.current.querySelectorAll("line");
-      HARDCODED_USERS.forEach((user, i) => {
-        const from = getLayerPoint(HARDCODED_CENTER.lat, HARDCODED_CENTER.lng);
-        const to = getLayerPoint(user.lat, user.lng);
-        const line = lines[i];
-        if (!line) return;
-        line.setAttribute("x1", String(from.x));
-        line.setAttribute("y1", String(from.y));
-        line.setAttribute("x2", String(to.x));
-        line.setAttribute("y2", String(to.y));
-      });
+        if (!svgOverlayRef.current) return;
+        const paths = svgOverlayRef.current.querySelectorAll("path");
+        HARDCODED_USERS.forEach((user, i) => {
+            const from = getLayerPoint(HARDCODED_CENTER.lat, HARDCODED_CENTER.lng);
+            const to = getLayerPoint(user.lat, user.lng);
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const cx = (from.x + to.x) / 2 - dy * 0.25;
+            const cy = (from.y + to.y) / 2 + dx * 0.25;
+            const path = paths[i];
+            if (!path) return;
+            path.setAttribute("d", `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`);
+        });
     }
 
     map.on("move zoom", onMoveUpdate);
