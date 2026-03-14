@@ -46,7 +46,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("chat:accept", (payload: { fromId: string; toId: string }) => {
+  socket.on("chat:accept", (payload: { fromId: string; toId: string; peerName?: string }) => {
     if (!payload?.fromId || !payload?.toId) return;
     const otherSocketId = userIdToSocketId.get(payload.fromId);
     const thisUserId = socket.data.userId as string | undefined;
@@ -55,14 +55,18 @@ io.on("connection", (socket) => {
     const conversationId =
       [payload.fromId, payload.toId].sort().join(":");
 
+    // Tell the original sender that their request was accepted
     io.to(otherSocketId).emit("chat:accepted", {
       conversationId,
       peerId: payload.toId,
+      peerName: payload.peerName ?? "Someone",
     });
 
+    // Tell the accepter too
     socket.emit("chat:accepted", {
       conversationId,
       peerId: payload.fromId,
+      peerName: payload.peerName ?? "Someone",
     });
   });
 

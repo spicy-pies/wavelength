@@ -15,20 +15,6 @@ export interface NearbyUser {
   name?: string;
 }
 
-// ─── HARDCODED CENTER (Sydney CBD) ───────────────────────────────────────────
-const HARDCODED_CENTER = { lat: -33.8688, lng: 151.2093 };
-
-// ─── HARDCODED NEARBY USERS — spread across ~2 km radius ────────────────────
-const HARDCODED_USERS: NearbyUser[] = [
-  { uid: "user-1", similarity: 0.88, lat: -33.8565, lng: 151.2050, sharedInterests: ["Radiohead", "Elden Ring", "Succession"] },
-  { uid: "user-2", similarity: 0.72, lat: -33.8720, lng: 151.1900, sharedInterests: ["Bon Iver", "Hollow Knight", "The Bear"] },
-  { uid: "user-3", similarity: 0.81, lat: -33.8580, lng: 151.2240, sharedInterests: ["Frank Ocean", "Disco Elysium", "Fleabag"] },
-  { uid: "user-4", similarity: 0.10, lat: -33.8830, lng: 151.2180, sharedInterests: ["Tame Impala", "Stardew Valley", "Atlanta"] },
-  { uid: "user-5", similarity: 0.69, lat: -33.8650, lng: 151.1950, sharedInterests: ["Mitski", "Hades", "Severance"] },
-  { uid: "user-6", similarity: 0.46, lat: -33.8810, lng: 151.1980, sharedInterests: ["James Blake", "Celeste", "Skins"] },
-  { uid: "user-7", similarity: 0.63, lat: -33.8770, lng: 151.2230, sharedInterests: ["FKA Twigs", "Outer Wilds", "Twin Peaks"] },
-];
-
 type ChatMessage = {
   conversationId: string;
   fromId: string;
@@ -37,44 +23,75 @@ type ChatMessage = {
   timestamp: number;
 };
 
-type IncomingRequest = {
+type PendingRequest = {
   fromId: string;
-  preview?: string;
+  toId: string;
+  preview: string;
+  timestamp: number;
 };
+
+type AcceptedConvo = {
+  conversationId: string;
+  peerId: string;
+  peerName: string;
+  peerUid: string;
+  similarity: number;
+  sharedInterests: string[];
+};
+
+// ─── HARDCODED CENTER (Sydney CBD) ───────────────────────────────────────────
+const HARDCODED_CENTER = { lat: -33.8688, lng: 151.2093 };
+
+// ─── HARDCODED NEARBY USERS — spread across ~2 km radius ────────────────────
+const HARDCODED_USERS: NearbyUser[] = [
+  { uid: "5e6c0537-349c-4b98-aecc-6d6a8ba88fa9", similarity: 0.88, lat: -33.8565, lng: 151.2050, sharedInterests: ["Radiohead", "Elden Ring", "Succession"], name: "Alex" },
+  { uid: "user-2", similarity: 0.72, lat: -33.8720, lng: 151.1900, sharedInterests: ["Bon Iver", "Hollow Knight", "The Bear"], name: "Jordan" },
+  { uid: "35866b09-bf8e-4f8a-befd-3770f4dcd528", similarity: 0.81, lat: -33.8580, lng: 151.2240, sharedInterests: ["Frank Ocean", "Disco Elysium", "Fleabag"], name: "Sam" },
+  { uid: "user-4", similarity: 0.10, lat: -33.8830, lng: 151.2180, sharedInterests: ["Tame Impala", "Stardew Valley", "Atlanta"], name: "Riley" },
+  { uid: "user-5", similarity: 0.69, lat: -33.8650, lng: 151.1950, sharedInterests: ["Mitski", "Hades", "Severance"], name: "Mika" },
+  { uid: "user-6", similarity: 0.46, lat: -33.8810, lng: 151.1980, sharedInterests: ["James Blake", "Celeste", "Skins"], name: "Quinn" },
+  { uid: "user-7", similarity: 0.63, lat: -33.8770, lng: 151.2230, sharedInterests: ["FKA Twigs", "Outer Wilds", "Twin Peaks"], name: "Dana" },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function similarityToColor(score: number): { fill: string; glow: string; text: string } {
-  if (score >= 0.85) return { fill: "#C0392B", glow: "rgba(192,57,43,0.35)",   text: "#fff" };
-  if (score >= 0.70) return { fill: "#E05B4B", glow: "rgba(224,91,75,0.30)",   text: "#fff" };
+  if (score >= 0.85) return { fill: "#C0392B", glow: "rgba(192,57,43,0.35)", text: "#fff" };
+  if (score >= 0.70) return { fill: "#E05B4B", glow: "rgba(224,91,75,0.30)", text: "#fff" };
   if (score >= 0.55) return { fill: "#EF8C7E", glow: "rgba(239,140,126,0.25)", text: "#fff" };
   if (score >= 0.40) return { fill: "#F5B8B0", glow: "rgba(245,184,176,0.20)", text: "#9a3a30" };
-  return                     { fill: "#FAD7D3", glow: "rgba(250,215,211,0.15)", text: "#b05048" };
+  return { fill: "#FAD7D3", glow: "rgba(250,215,211,0.15)", text: "#b05048" };
 }
+
+function getConvoId(a: string, b: string) { return [a, b].sort().join(":"); }
 
 const HEART_SIZE_BASE = 56;
 const HEART_SIZE_MAX = 80;
 
-// ─── Heart marker ────────────────────────────────────────────────────────────
-// Uses heart-3d.png from public/. CSS filter: low % = paler, high % = brighter.
-//   Low compatibility  → very desaturated + dimmer = pale, washed-out pink
-//   High compatibility → saturated + brighter = vivid, strong red
+// ─── Heart marker builder ────────────────────────────────────────────────────
 
-function buildCuteHeart(_fill: string, _glow: string, _textColor: string, pct: number, index: number): string {
+function buildCuteHeart(_fill: string, _glow: string, _textColor: string, pct: number, index: number, hasPendingRequest = false, hasActiveConvo = false): string {
   const delay = (index * 0.4) % 2.8;
   const score01 = pct / 100;
   const size = Math.round(HEART_SIZE_BASE + score01 * (HEART_SIZE_MAX - HEART_SIZE_BASE));
+  const saturate = (0.1 + score01 * 1.25).toFixed(2);
+  const brightness = (0.82 + score01 * 0.32).toFixed(2);
 
-  const saturate = (0.1 + score01 * 1.25).toFixed(2);   // 0.1 (pale) → 1.35 (vivid)
-  const brightness = (0.82 + score01 * 0.32).toFixed(2); // 0.82 (dimmer) → 1.14 (brighter)
+  const pulseClass = hasPendingRequest ? "wl-heart-pulse" : "";
+  const badge = hasPendingRequest
+    ? `<div style="position:absolute;top:-2px;right:-2px;width:16px;height:16px;background:#C0392B;border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:white;font-weight:700;z-index:5;">!</div>`
+    : hasActiveConvo
+    ? `<div style="position:absolute;top:-2px;right:-2px;width:16px;height:16px;background:#1abc9c;border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:5;"><svg width="8" height="8" viewBox="0 0 24 24" fill="white"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></div>`
+    : "";
 
   return `
-    <div class="wl-heart" style="
+    <div class="wl-heart ${pulseClass}" style="
       position:relative;
       width:${size}px;height:${size}px;
       cursor:pointer;
       animation: wl-float ${2.5 + (index % 3) * 0.3}s ease-in-out ${delay}s infinite;
     ">
+      ${badge}
       <img
         src="/heart-3d.png"
         width="${size}" height="${size}"
@@ -104,7 +121,7 @@ function buildCuteHeart(_fill: string, _glow: string, _textColor: string, pct: n
   `;
 }
 
-// ─── Inject animation keyframes once ─────────────────────────────────────────
+// ─── Inject styles ───────────────────────────────────────────────────────────
 let stylesInjected = false;
 function injectStyles() {
   if (stylesInjected || typeof document === "undefined") return;
@@ -115,72 +132,64 @@ function injectStyles() {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-5px); }
     }
-    .wl-heart img {
-      transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1);
+    @keyframes wl-pulse {
+      0%, 100% { filter: drop-shadow(0 0 0px rgba(192,57,43,0)); }
+      50% { filter: drop-shadow(0 0 14px rgba(192,57,43,0.6)); }
     }
-    .wl-heart:hover img {
-      transform: scale(1.08);
-    }
+    .wl-heart img { transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1); }
+    .wl-heart:hover img { transform: scale(1.08); }
+    .wl-heart-pulse img { animation: wl-pulse 1.2s ease-in-out infinite; }
     .leaflet-marker-icon.leaflet-wavelength-heart {
-      width: ${HEART_SIZE_MAX}px !important;
-      height: ${HEART_SIZE_MAX}px !important;
-      margin-left: -${HEART_SIZE_MAX / 2}px !important;
-      margin-top: -${HEART_SIZE_MAX / 2}px !important;
+      width: ${HEART_SIZE_MAX}px !important; height: ${HEART_SIZE_MAX}px !important;
+      margin-left: -${HEART_SIZE_MAX / 2}px !important; margin-top: -${HEART_SIZE_MAX / 2}px !important;
     }
     .leaflet-marker-icon.leaflet-wavelength-heart.wl-heart-selected .wl-heart {
-      box-shadow: 0 0 0 6px rgba(192,57,43,0.14), 0 10px 26px rgba(0,0,0,0.22);
-      border-radius: 50%;
+      box-shadow: 0 0 0 6px rgba(192,57,43,0.14), 0 10px 26px rgba(0,0,0,0.22); border-radius: 50%;
     }
-    .leaflet-marker-icon.leaflet-wavelength-heart.wl-heart-selected .wl-heart img {
-      transform: scale(1.12);
-    }
+    .leaflet-marker-icon.leaflet-wavelength-heart.wl-heart-selected .wl-heart img { transform: scale(1.12); }
+    @keyframes slideInRight { from { transform: translateX(100%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+    @keyframes slideOutRight { from { transform: translateX(0); opacity:1; } to { transform: translateX(100%); opacity:0; } }
   `;
   document.head.appendChild(s);
 }
 
-// ─── Compute thread as lat/lng points (cubic Bézier in geo-space) ────────────
+// ─── Compute thread points ───────────────────────────────────────────────────
 
-function computeThreadPoints(
-  fromLat: number, fromLng: number,
-  toLat: number, toLng: number,
-  index: number
-): [number, number][] {
+function computeThreadPoints(fromLat: number, fromLng: number, toLat: number, toLng: number, index: number): [number, number][] {
   const dLat = toLat - fromLat;
   const dLng = toLng - fromLng;
-
   const laterals = [0.30, -0.22, 0.42, -0.38, 0.18, -0.48, 0.35];
-  const sags     = [0.35, 0.28, 0.40, 0.32, 0.25, 0.38, 0.30];
+  const sags = [0.35, 0.28, 0.40, 0.32, 0.25, 0.38, 0.30];
   const lateral = laterals[index % laterals.length];
   const sag = sags[index % sags.length];
-
-  const perpLat = -dLng;
-  const perpLng = dLat;
-
+  const perpLat = -dLng, perpLng = dLat;
   const cp1Lat = fromLat + dLat * 0.30 + perpLat * lateral + Math.abs(dLat + dLng) * sag * 0.5;
   const cp1Lng = fromLng + dLng * 0.30 + perpLng * lateral;
-
   const cp2Lat = fromLat + dLat * 0.70 + perpLat * lateral * 0.4 + Math.abs(dLat + dLng) * sag * 0.25;
   const cp2Lng = fromLng + dLng * 0.70 + perpLng * lateral * 0.4;
-
   const pts: [number, number][] = [];
   const N = 40;
   for (let i = 0; i <= N; i++) {
-    const t = i / N;
-    const u = 1 - t;
+    const t = i / N, u = 1 - t;
     pts.push([
-      u*u*u*fromLat + 3*u*u*t*cp1Lat + 3*u*t*t*cp2Lat + t*t*t*toLat,
-      u*u*u*fromLng + 3*u*u*t*cp1Lng + 3*u*t*t*cp2Lng + t*t*t*toLng,
+      u * u * u * fromLat + 3 * u * u * t * cp1Lat + 3 * u * t * t * cp2Lat + t * t * t * toLat,
+      u * u * u * fromLng + 3 * u * u * t * cp1Lng + 3 * u * t * t * cp2Lng + t * t * t * toLng,
     ]);
   }
   return pts;
 }
 
-// ─── Profile Popup ────────────────────────────────────────────────────────────
+// ─── Profile Popup (3 modes: normal / incoming-request / active-convo) ───────
 
-function ProfilePopup({ user, onClose, onChat }: {
+function ProfilePopup({ user, onClose, onChat, mode, pendingPreview, onAccept, onDecline, onGoToChat }: {
   user: NearbyUser;
   onClose: () => void;
   onChat: (uid: string) => void;
+  mode: "normal" | "incoming" | "active";
+  pendingPreview?: string;
+  onAccept?: () => void;
+  onDecline?: () => void;
+  onGoToChat?: () => void;
 }) {
   const pct = Math.round(user.similarity * 100);
   const { fill } = similarityToColor(user.similarity);
@@ -207,7 +216,8 @@ function ProfilePopup({ user, onClose, onChat }: {
         fontSize: 11, color: "#C0392B", fontWeight: 600,
         marginBottom: 12, letterSpacing: "0.03em",
       }}>
-        <span style={{ fontSize: 10 }}>✦</span> MUTUAL VIBES ONLY
+        <span style={{ fontSize: 10 }}>✦</span>
+        {mode === "incoming" ? "SOMEONE SAID HEY" : mode === "active" ? "CONNECTED" : "MUTUAL VIBES ONLY"}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
@@ -217,239 +227,269 @@ function ProfilePopup({ user, onClose, onChat }: {
             <circle cx={28} cy={28} r={22} fill="none" stroke={fill} strokeWidth={5}
               strokeDasharray={`${2 * Math.PI * 22}`}
               strokeDashoffset={`${2 * Math.PI * 22 * (1 - user.similarity)}`}
-              strokeLinecap="round" transform="rotate(-90 28 28)"
-            />
+              strokeLinecap="round" transform="rotate(-90 28 28)" />
           </svg>
           <span style={{
-            position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
+            position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 13, fontWeight: 700, color: fill,
           }}>{pct}%</span>
         </div>
         <div>
           <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 2 }}>
-            {pct >= 80 ? "Strong match" : pct >= 60 ? "Good match" : "Possible match"}
+            {mode === "active" ? user.name : pct >= 80 ? "Strong match" : pct >= 60 ? "Good match" : "Possible match"}
           </div>
           <div style={{ fontSize: 12, color: "#888" }}>
-            {user.name ?? "Someone nearby"}
+            {mode === "active" ? `${pct}% compatible` : user.name && mode === "incoming" ? "Someone nearby" : "Someone nearby"}
           </div>
         </div>
       </div>
 
+      {/* Shared interests */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: "0.05em", marginBottom: 6 }}>
-          BOTH INTO
-        </div>
+        <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: "0.05em", marginBottom: 6 }}>BOTH INTO</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
           {user.sharedInterests.map(tag => (
             <span key={tag} style={{
-              background: "#FFF5F4", color: "#C0392B",
-              border: "1px solid #FFD5CF", borderRadius: 99,
-              padding: "3px 10px", fontSize: 12, fontWeight: 500,
+              background: "#FFF5F4", color: "#C0392B", border: "1px solid #FFD5CF",
+              borderRadius: 99, padding: "3px 10px", fontSize: 12, fontWeight: 500,
             }}>{tag}</span>
           ))}
         </div>
       </div>
 
-      <button
-        onClick={() => onChat(user.uid)}
-        style={{
-          width: "100%", background: fill, color: "#fff",
-          border: "none", borderRadius: 12, padding: "11px 0",
-          fontSize: 14, fontWeight: 600, cursor: "pointer",
-          letterSpacing: "0.01em", transition: "opacity 0.15s",
+      {/* Incoming request: show preview + accept/decline */}
+      {mode === "incoming" && pendingPreview && (
+        <div style={{
+          background: "#FFF5F4", borderRadius: 12, padding: "10px 12px",
+          marginBottom: 14, fontSize: 13, color: "#5a1e1a", lineHeight: 1.5,
+          borderLeft: "3px solid #C0392B",
+        }}>
+          "{pendingPreview}"
+        </div>
+      )}
+
+      {mode === "incoming" && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onDecline} style={{
+            flex: 1, background: "#fff", color: "#666", border: "1px solid rgba(0,0,0,0.12)",
+            borderRadius: 12, padding: "11px 0", fontSize: 14, fontWeight: 500, cursor: "pointer",
+          }}>Not now</button>
+          <button onClick={onAccept} style={{
+            flex: 1, background: "#C0392B", color: "#fff", border: "none",
+            borderRadius: 12, padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer",
+          }}>Accept & chat</button>
+        </div>
+      )}
+
+      {mode === "active" && (
+        <button onClick={onGoToChat} style={{
+          width: "100%", background: "#1abc9c", color: "#fff", border: "none",
+          borderRadius: 12, padding: "11px 0", fontSize: 14, fontWeight: 600,
+          cursor: "pointer", transition: "opacity 0.15s",
+        }}>Go to their chat →</button>
+      )}
+
+      {mode === "normal" && (
+        <button onClick={() => onChat(user.uid)} style={{
+          width: "100%", background: fill, color: "#fff", border: "none",
+          borderRadius: 12, padding: "11px 0", fontSize: 14, fontWeight: 600,
+          cursor: "pointer", letterSpacing: "0.01em", transition: "opacity 0.15s",
         }}
-        onMouseOver={e => (e.currentTarget.style.opacity = "0.88")}
-        onMouseOut={e => (e.currentTarget.style.opacity = "1")}
-      >
-        Start conversation →
-      </button>
+          onMouseOver={e => (e.currentTarget.style.opacity = "0.88")}
+          onMouseOut={e => (e.currentTarget.style.opacity = "1")}
+        >Start conversation →</button>
+      )}
     </div>
   );
 }
 
-// ─── Chat Overlay ─────────────────────────────────────────────────────────────
+// ─── Side Panel Chat ─────────────────────────────────────────────────────────
 
-function ChatOverlay({
-  open,
-  onClose,
-  peer,
-  messages,
-  myId,
-  onSend,
-  pendingIntro,
-  canSendMore,
-}: {
-  open: boolean;
-  onClose: () => void;
-  peer: NearbyUser | null;
-  messages: ChatMessage[];
-  myId: string | null;
-  onSend: (text: string) => void;
-  pendingIntro: boolean;
-  canSendMore: boolean;
+function ChatPanel({ open, onClose, peer, messages, myId, onSend }: {
+  open: boolean; onClose: () => void; peer: AcceptedConvo | null;
+  messages: ChatMessage[]; myId: string | null; onSend: (text: string) => void;
 }) {
   const [draft, setDraft] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
 
   if (!open || !peer || !myId) return null;
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        right: 20,
-        bottom: 24,
-        width: 280,
-        maxHeight: 360,
-        background: "rgba(255,255,255,0.98)",
-        borderRadius: 18,
-        boxShadow: "0 10px 40px rgba(0,0,0,0.18)",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        zIndex: 900,
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          padding: "10px 12px",
-          borderBottom: "1px solid rgba(0,0,0,0.06)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#1a1a1a",
-            }}
-          >
-            Chat on wavelength
-          </div>
-          <div style={{ fontSize: 11, color: "#999" }}>
-            {peer.name ?? "Someone nearby"}
-          </div>
+    <div style={{
+      position: "absolute", top: 0, right: 0, bottom: 0, width: 360,
+      background: "white", zIndex: 950, display: "flex", flexDirection: "column",
+      boxShadow: "-4px 0 30px rgba(0,0,0,0.1)",
+      animation: "slideInRight 0.25s ease-out",
+      fontFamily: "'DM Sans', system-ui, sans-serif",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.06)",
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
+        <button onClick={onClose} style={{
+          background: "none", border: "none", fontSize: 20, color: "#aaa",
+          cursor: "pointer", lineHeight: 1, padding: 0,
+        }}>←</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{peer.peerName}</div>
+          <div style={{ fontSize: 12, color: "#999" }}>{peer.similarity ? Math.round(peer.similarity * 100) + "% compatible" : ""}</div>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            border: "none",
-            background: "transparent",
-            fontSize: 16,
-            color: "#bbb",
-            cursor: "pointer",
-          }}
-        >
-          ×
-        </button>
+        <div style={{
+          display: "flex", flexWrap: "wrap", gap: 3, maxWidth: 140,
+        }}>
+          {peer.sharedInterests?.slice(0, 2).map(t => (
+            <span key={t} style={{
+              fontSize: 9, padding: "2px 6px", background: "#FFF5F4",
+              color: "#C0392B", borderRadius: 99, fontWeight: 500,
+            }}>{t}</span>
+          ))}
+        </div>
       </div>
 
-      <div
-        style={{
-          flex: 1,
-          padding: "8px 10px 6px",
-          overflowY: "auto",
-          fontSize: 12,
-        }}
-      >
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
         {messages.length === 0 && (
-          <p
-            style={{
-              margin: 0,
-              padding: "6px 4px 10px",
-              color: "#999",
-            }}
-          >
-            {pendingIntro
-              ? "Send a first message. They’ll see it with an option to say hi back."
-              : canSendMore
-              ? "No messages yet. Say hi!"
-              : "Waiting for them to accept your request."}
+          <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", marginTop: 40 }}>
+            You're connected! Say something.
           </p>
         )}
         {messages.map((m) => {
           const mine = m.fromId === myId;
           return (
-            <div
-              key={m.timestamp + m.fromId}
-              style={{
-                display: "flex",
-                justifyContent: mine ? "flex-end" : "flex-start",
-                marginBottom: 4,
-              }}
-            >
-              <div
-                style={{
-                  maxWidth: "80%",
-                  padding: "6px 9px",
-                  borderRadius: 12,
-                  fontSize: 12,
-                  lineHeight: 1.4,
-                  background: mine ? "#C0392B" : "#F5B8B0",
-                  color: mine ? "#fff" : "#5a1e1a",
-                }}
-              >
-                {m.text}
-              </div>
+            <div key={m.timestamp + m.fromId} style={{
+              display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 6,
+            }}>
+              <div style={{
+                maxWidth: "75%", padding: "8px 12px", borderRadius: 16,
+                fontSize: 13, lineHeight: 1.5,
+                background: mine ? "#C0392B" : "#F5F5F5",
+                color: mine ? "#fff" : "#1a1a1a",
+                borderBottomRightRadius: mine ? 4 : 16,
+                borderBottomLeftRadius: mine ? 16 : 4,
+              }}>{m.text}</div>
             </div>
           );
         })}
+        <div ref={messagesEndRef} />
       </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!draft.trim() || !canSendMore) return;
-          onSend(draft.trim());
-          setDraft("");
-        }}
-        style={{
-          padding: "6px 8px 8px",
-          borderTop: "1px solid rgba(0,0,0,0.06)",
-          display: "flex",
-          gap: 6,
-        }}
-      >
+      {/* Input */}
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        if (!draft.trim()) return;
+        onSend(draft.trim());
+        setDraft("");
+      }} style={{
+        padding: "12px 16px", borderTop: "1px solid rgba(0,0,0,0.06)",
+        display: "flex", gap: 8,
+      }}>
         <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={
-            canSendMore
-              ? "Send a quick hello…"
-              : "Waiting for them to accept…"
-          }
-          disabled={!canSendMore}
+          value={draft} onChange={(e) => setDraft(e.target.value)}
+          placeholder="Type a message…"
           style={{
-            flex: 1,
-            borderRadius: 999,
-            border: "1px solid rgba(0,0,0,0.12)",
-            padding: "6px 10px",
-            fontSize: 12,
-            outline: "none",
+            flex: 1, borderRadius: 24, border: "1px solid rgba(0,0,0,0.1)",
+            padding: "10px 16px", fontSize: 13, outline: "none",
           }}
         />
-        <button
-          type="submit"
-          style={{
-            borderRadius: 999,
-            border: "none",
-            padding: "6px 10px",
-            fontSize: 11,
-            fontWeight: 600,
-            background: "#C0392B",
-            color: "#fff",
-            cursor: canSendMore ? "pointer" : "not-allowed",
-            opacity: canSendMore ? 1 : 0.6,
-          }}
-          disabled={!canSendMore}
-        >
-          Send
-        </button>
+        <button type="submit" style={{
+          borderRadius: 24, border: "none", padding: "10px 18px",
+          fontSize: 13, fontWeight: 600, background: "#C0392B", color: "#fff", cursor: "pointer",
+        }}>Send</button>
       </form>
+    </div>
+  );
+}
+
+// ─── Inbox Panel ─────────────────────────────────────────────────────────────
+
+function InboxPanel({ open, onClose, convos, messages, onSelect }: {
+  open: boolean; onClose: () => void; convos: AcceptedConvo[];
+  messages: Record<string, ChatMessage[]>; onSelect: (c: AcceptedConvo) => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div style={{
+      position: "absolute", top: 0, right: 0, bottom: 0, width: 360,
+      background: "white", zIndex: 950, display: "flex", flexDirection: "column",
+      boxShadow: "-4px 0 30px rgba(0,0,0,0.1)",
+      animation: "slideInRight 0.25s ease-out",
+      fontFamily: "'DM Sans', system-ui, sans-serif",
+    }}>
+      <div style={{
+        padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.06)",
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
+        <button onClick={onClose} style={{
+          background: "none", border: "none", fontSize: 20, color: "#aaa",
+          cursor: "pointer", lineHeight: 1, padding: 0,
+        }}>←</button>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a" }}>Messages</div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {convos.length === 0 && (
+          <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", marginTop: 40, padding: "0 20px" }}>
+            No conversations yet. Tap a heart on the map to start one.
+          </p>
+        )}
+        {convos.map((c) => {
+          const msgs = messages[c.conversationId] ?? [];
+          const last = msgs[msgs.length - 1];
+          return (
+            <button key={c.conversationId} onClick={() => onSelect(c)} style={{
+              width: "100%", padding: "14px 20px", background: "transparent",
+              border: "none", borderBottom: "1px solid rgba(0,0,0,0.04)",
+              display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
+              textAlign: "left",
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%", background: "#F5B8B0",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 14, fontWeight: 700, color: "#C0392B", flexShrink: 0,
+              }}>{c.peerName.charAt(0)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{c.peerName}</div>
+                <div style={{
+                  fontSize: 12, color: "#999", whiteSpace: "nowrap",
+                  overflow: "hidden", textOverflow: "ellipsis",
+                }}>{last ? last.text : "Start chatting…"}</div>
+              </div>
+              <div style={{ fontSize: 11, color: "#ccc", flexShrink: 0 }}>
+                {last ? new Date(last.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Small toast ─────────────────────────────────────────────────────────────
+
+function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+
+  return (
+    <div onClick={onDismiss} style={{
+      position: "absolute", top: 80, left: "50%", transform: "translateX(-50%)",
+      background: "rgba(255,255,255,0.96)", backdropFilter: "blur(12px)",
+      borderRadius: 14, padding: "10px 18px", boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
+      zIndex: 999, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+      fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 13, fontWeight: 500,
+      color: "#1a1a1a", maxWidth: 340,
+    }}>
+      <span style={{ fontSize: 16 }}>💓</span>
+      {message}
     </div>
   );
 }
@@ -463,42 +503,62 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [myId, setMyId] = useState<string | null>(null);
-  const [chatPeer, setChatPeer] = useState<NearbyUser | null>(null);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [conversations, setConversations] = useState<Record<string, ChatMessage[]>>({});
-  const [incomingRequest, setIncomingRequest] = useState<IncomingRequest | null>(null);
-  const [acceptedConversations, setAcceptedConversations] = useState<Record<string, boolean>>({});
 
+  // Messaging state
+  const [pendingRequests, setPendingRequests] = useState<Record<string, PendingRequest>>({}); // keyed by fromId
+  const [sentRequests, setSentRequests] = useState<Record<string, string>>({}); // keyed by toId → preview
+  const [acceptedConvos, setAcceptedConvos] = useState<AcceptedConvo[]>([]);
+  const [conversations, setConversations] = useState<Record<string, ChatMessage[]>>({});
+  const [activeChatConvo, setActiveChatConvo] = useState<AcceptedConvo | null>(null);
+  const [chatPanelOpen, setChatPanelOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // ── Chat overlay (pre-accept opener) ──
+  const [chatOverlayPeer, setChatOverlayPeer] = useState<NearbyUser | null>(null);
+  const [chatOverlayOpen, setChatOverlayOpen] = useState(false);
+  const [chatOverlayCid, setChatOverlayCid] = useState<string | null>(null);
+
+  // Helper: is this uid an accepted conversation?
+  const getAcceptedConvo = useCallback((uid: string) => {
+    return acceptedConvos.find(c => c.peerUid === uid) ?? null;
+  }, [acceptedConvos]);
+
+  // Helper: does this uid have a pending incoming request?
+  const getPendingFrom = useCallback((uid: string) => {
+    return pendingRequests[uid] ?? null;
+  }, [pendingRequests]);
+
+  // Helper: did I already send a request to this uid?
+  const hasSentRequest = useCallback((uid: string) => {
+    return uid in sentRequests;
+  }, [sentRequests]);
+
+  // ── Load Leaflet ──
   useEffect(() => {
     if (typeof window === "undefined") return;
     injectStyles();
     if ((window as any).L) { setLeafletLoaded(true); return; }
-
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
     document.head.appendChild(link);
-
     const script = document.createElement("script");
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = () => setLeafletLoaded(true);
     document.head.appendChild(script);
   }, []);
 
-  // Assign a stable anonymous id for this browser
+  // ── Anon ID ──
   useEffect(() => {
     if (typeof window === "undefined") return;
     const KEY = "wavelength:anonUserId";
     let stored = window.localStorage.getItem(KEY);
-    if (!stored) {
-      stored = window.crypto.randomUUID();
-      window.localStorage.setItem(KEY, stored);
-    }
+    if (!stored) { stored = window.crypto.randomUUID(); window.localStorage.setItem(KEY, stored); }
     setMyId(stored);
   }, []);
 
-  // Connect socket.io for chat
+  // ── Socket ──
   useEffect(() => {
     if (!myId) return;
     const url = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:3001";
@@ -506,106 +566,93 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
     setSocket(s);
     s.emit("register", { userId: myId });
 
-    s.on("chat:incoming", (payload: IncomingRequest) => {
-      setIncomingRequest(payload);
+    s.on("chat:incoming", (payload: { fromId: string; preview?: string }) => {
+      setPendingRequests(prev => ({
+        ...prev,
+        [payload.fromId]: { fromId: payload.fromId, toId: myId, preview: payload.preview ?? "", timestamp: Date.now() },
+      }));
+      setToastMessage("Someone on your wavelength said hey 💓");
     });
 
-    s.on("chat:accepted", (payload: { conversationId: string; peerId: string }) => {
-      const peer = HARDCODED_USERS.find((u) => u.uid === payload.peerId) ?? null;
-      setChatPeer(peer);
-      setConversationId(payload.conversationId);
-      setChatOpen(true);
-      setAcceptedConversations((prev) => ({
-        ...prev,
-        [payload.conversationId]: true,
-      }));
+    s.on("chat:accepted", (payload: { conversationId: string; peerId: string; peerName: string }) => {
+      const peer = HARDCODED_USERS.find(u => u.uid === payload.peerId);
+      const convo: AcceptedConvo = {
+        conversationId: payload.conversationId,
+        peerId: payload.peerId,
+        peerName: payload.peerName,
+        peerUid: payload.peerId,
+        similarity: peer?.similarity ?? 0,
+        sharedInterests: peer?.sharedInterests ?? [],
+      };
+      setAcceptedConvos(prev => {
+        if (prev.some(c => c.conversationId === convo.conversationId)) return prev;
+        return [...prev, convo];
+      });
+      setSentRequests(prev => { const n = { ...prev }; delete n[payload.peerId]; return n; });
+      // Auto-open chat panel
+      setActiveChatConvo(convo);
+      setChatPanelOpen(true);
+      setChatOverlayOpen(false);
+      setSelectedUser(null);
     });
 
     s.on("chat:message", (payload: ChatMessage) => {
-      setConversations((prev) => {
+      setConversations(prev => {
         const existing = prev[payload.conversationId] ?? [];
-        return {
-          ...prev,
-          [payload.conversationId]: [...existing, payload],
-        };
+        return { ...prev, [payload.conversationId]: [...existing, payload] };
       });
     });
 
-    return () => {
-      s.disconnect();
-    };
+    return () => { s.disconnect(); };
   }, [myId]);
 
+  // ── Init map ──
   useEffect(() => {
     if (!leafletLoaded || !mapRef.current || mapInstanceRef.current) return;
     const L = (window as any).L;
-
     const map = L.map(mapRef.current, {
       center: [HARDCODED_CENTER.lat, HARDCODED_CENTER.lng],
-      zoom: 15,
-      zoomControl: false,
-      attributionControl: false,
+      zoom: 15, zoomControl: false, attributionControl: false,
     });
-
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-    }).addTo(map);
-
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
     L.control.zoom({ position: "bottomright" }).addTo(map);
     mapInstanceRef.current = map;
-
-    // Clicking on empty map clears selection + closes chat
     map.on("click", () => {
       setSelectedUser(null);
-      setChatPeer(null);
-      setChatOpen(false);
-      setConversationId(null);
-      // Clear visual selection halo when clicking empty map
       const existing = document.querySelectorAll(".leaflet-wavelength-heart.wl-heart-selected");
-      existing.forEach((el) => el.classList.remove("wl-heart-selected"));
+      existing.forEach(el => el.classList.remove("wl-heart-selected"));
     });
   }, [leafletLoaded]);
 
-  // When selectedUser is cleared (e.g. via popup close button),
-  // also remove the halo on any heart.
   useEffect(() => {
     if (selectedUser) return;
     if (typeof document === "undefined") return;
     const existing = document.querySelectorAll(".leaflet-wavelength-heart.wl-heart-selected");
-    existing.forEach((el) => el.classList.remove("wl-heart-selected"));
+    existing.forEach(el => el.classList.remove("wl-heart-selected"));
   }, [selectedUser]);
 
+  // ── Draw markers (re-run when pending/accepted state changes) ──
   const redrawMarkers = useCallback(() => {
     const L = (window as any).L;
     const map = mapInstanceRef.current;
     if (!map || !L) return;
 
-    map.eachLayer((layer: any) => {
-      if (layer._wavelength) map.removeLayer(layer);
-    });
+    map.eachLayer((layer: any) => { if (layer._wavelength) map.removeLayer(layer); });
 
+    // You marker
     const youIcon = L.divIcon({
       className: "",
-      html: `<div style="
-        width:18px;height:18px;background:#1abc9c;
-        border:3px solid white;border-radius:50%;
-        box-shadow:0 0 0 5px rgba(26,188,156,0.2),0 0 12px rgba(26,188,156,0.3);
-      "></div>`,
-      iconSize: [18, 18],
-      iconAnchor: [9, 9],
+      html: `<div style="width:18px;height:18px;background:#1abc9c;border:3px solid white;border-radius:50%;box-shadow:0 0 0 5px rgba(26,188,156,0.2),0 0 12px rgba(26,188,156,0.3);"></div>`,
+      iconSize: [18, 18], iconAnchor: [9, 9],
     });
     const youMarker = L.marker([HARDCODED_CENTER.lat, HARDCODED_CENTER.lng], { icon: youIcon });
     youMarker._wavelength = true;
     youMarker.addTo(map);
 
+    // 2km ring
     const ring = L.circle([HARDCODED_CENTER.lat, HARDCODED_CENTER.lng], {
-      radius: 2000,
-      color: "rgba(192,57,43,0.12)",
-      weight: 1.5,
-      dashArray: "6 4",
-      fillColor: "rgba(192,57,43,0.02)",
-      fillOpacity: 1,
-      interactive: false,
+      radius: 2000, color: "rgba(192,57,43,0.12)", weight: 1.5, dashArray: "6 4",
+      fillColor: "rgba(192,57,43,0.02)", fillOpacity: 1, interactive: false,
     });
     ring._wavelength = true;
     ring.addTo(map);
@@ -614,57 +661,75 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
       const { fill, glow, text } = similarityToColor(user.similarity);
       const pct = Math.round(user.similarity * 100);
 
-      const pts = computeThreadPoints(
-        HARDCODED_CENTER.lat, HARDCODED_CENTER.lng,
-        user.lat, user.lng, i
-      );
+      // Thread
+      const pts = computeThreadPoints(HARDCODED_CENTER.lat, HARDCODED_CENTER.lng, user.lat, user.lng, i);
       const thread = L.polyline(pts, {
-        color: "#C0392B",
-        weight: 1.5,
-        opacity: 0.35,
-        smoothFactor: 1.5,
-        lineCap: "round",
-        lineJoin: "round",
-        interactive: false,
+        color: "#C0392B", weight: 1.5, opacity: 0.35, smoothFactor: 1.5,
+        lineCap: "round", lineJoin: "round", interactive: false,
       });
       thread._wavelength = true;
       thread.addTo(map);
 
+      // Heart with state indicators
+      const hasPending = !!pendingRequests[user.uid];
+      const hasActive = acceptedConvos.some(c => c.peerUid === user.uid);
       const heartIcon = L.divIcon({
         className: "leaflet-wavelength-heart",
-        html: buildCuteHeart(fill, glow, text, pct, i),
+        html: buildCuteHeart(fill, glow, text, pct, i, hasPending, hasActive),
         iconSize: [HEART_SIZE_MAX, HEART_SIZE_MAX],
         iconAnchor: [HEART_SIZE_MAX / 2, HEART_SIZE_MAX / 2],
       });
       const marker = L.marker([user.lat, user.lng], { icon: heartIcon });
       marker._wavelength = true;
       marker.on("click", () => {
-        // Clear selection on any existing hearts
         const existing = document.querySelectorAll(".leaflet-wavelength-heart.wl-heart-selected");
-        existing.forEach((el) => el.classList.remove("wl-heart-selected"));
-
+        existing.forEach(el => el.classList.remove("wl-heart-selected"));
         const iconEl = (marker as any)._icon as HTMLElement | null;
-        if (iconEl) {
-          iconEl.classList.add("wl-heart-selected");
-        }
-
-        // Smoothly focus map toward this heart
+        if (iconEl) iconEl.classList.add("wl-heart-selected");
         const targetZoom = Math.max(map.getZoom(), 16);
         map.setView([user.lat, user.lng], targetZoom, { animate: true });
-
-        // Switch selection + close any previous chat/conversation until user starts again
         setSelectedUser(user);
-        setChatPeer(null);
-        setChatOpen(false);
-        setConversationId(null);
+        setChatOverlayOpen(false);
       });
       marker.addTo(map);
     });
-  }, []);
+  }, [pendingRequests, acceptedConvos]);
 
   useEffect(() => {
     if (mapInstanceRef.current && leafletLoaded) redrawMarkers();
   }, [leafletLoaded, redrawMarkers]);
+
+  // Track which conversations have been "read" (last seen timestamp per convo)
+  const [lastReadTimestamps, setLastReadTimestamps] = useState<Record<string, number>>({});
+
+  // Mark a conversation as read when opening it
+  const markAsRead = useCallback((convoId: string) => {
+    setLastReadTimestamps(prev => ({ ...prev, [convoId]: Date.now() }));
+  }, []);
+
+  // Count total unread messages across all accepted conversations
+  const unreadCount = acceptedConvos.reduce((total, c) => {
+    const msgs = conversations[c.conversationId] ?? [];
+    const lastRead = lastReadTimestamps[c.conversationId] ?? 0;
+    const unread = msgs.filter(m => m.fromId !== myId && m.timestamp > lastRead).length;
+    return total + unread;
+  }, 0)
+  // Also count pending incoming requests as unread
+  + Object.keys(pendingRequests).length;
+
+  // Auto-mark conversation as read when the chat panel is open and viewing it
+  useEffect(() => {
+    if (chatPanelOpen && activeChatConvo) {
+      markAsRead(activeChatConvo.conversationId);
+    }
+  }, [chatPanelOpen, activeChatConvo, conversations, markAsRead]);
+
+  // Determine popup mode for selected user
+  const popupMode: "normal" | "incoming" | "active" = selectedUser
+    ? getAcceptedConvo(selectedUser.uid) ? "active"
+    : getPendingFrom(selectedUser.uid) ? "incoming"
+    : "normal"
+    : "normal";
 
   return (
     <div style={{
@@ -673,6 +738,10 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
     }}>
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
 
+      {/* Toast */}
+      {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
+
+      {/* ── Nav ── */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, height: 64,
         background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)",
@@ -683,23 +752,34 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
           <svg width={20} height={14} viewBox="0 0 20 14">
             <polyline points="0,7 3,2 6,12 9,4 12,10 15,7 18,7"
-              fill="none" stroke="#C0392B" strokeWidth={1.8}
-              strokeLinecap="round" strokeLinejoin="round" />
+              fill="none" stroke="#C0392B" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span style={{ fontSize: 17, fontWeight: 600, color: "#1a1a1a", letterSpacing: "-0.3px" }}>
-            wavelength
-          </span>
+          <span style={{ fontSize: 17, fontWeight: 600, color: "#1a1a1a", letterSpacing: "-0.3px" }}>wavelength</span>
         </Link>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button style={{
             background: "white", border: "0.5px solid rgba(0,0,0,0.12)",
             borderRadius: 20, padding: "7px 16px",
             fontSize: 13, fontWeight: 500, color: "#333", cursor: "pointer",
           }}>Find your people nearby</button>
+          <button onClick={() => { setInboxOpen(true); setChatPanelOpen(false); }} style={{
+            position: "relative", background: "white", border: "0.5px solid rgba(0,0,0,0.12)",
+            borderRadius: 20, padding: "7px 16px",
+            fontSize: 13, fontWeight: 500, color: "#333", cursor: "pointer",
+          }}>
+            Messages
+            {unreadCount > 0 && (
+              <span style={{
+                position: "absolute", top: -4, right: -4, width: 18, height: 18,
+                background: "#C0392B", color: "white", borderRadius: "50%",
+                fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center",
+                justifyContent: "center", border: "2px solid white",
+              }}>{unreadCount}</span>
+            )}
+          </button>
           <button style={{
-            background: "none", border: "none",
-            fontSize: 13, fontWeight: 500, color: "#666",
-            cursor: "pointer", padding: "7px 8px",
+            background: "none", border: "none", fontSize: 13, fontWeight: 500,
+            color: "#666", cursor: "pointer", padding: "7px 8px",
           }}>My Profile</button>
         </div>
         <div style={{
@@ -709,12 +789,12 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
         }}>A</div>
       </div>
 
+      {/* ── Bottom-left stats ── */}
       <div style={{
         position: "absolute", bottom: 24, left: 20,
         background: "rgba(255,255,255,0.94)", backdropFilter: "blur(10px)",
         borderRadius: 16, padding: "14px 18px",
-        boxShadow: "0 2px 20px rgba(0,0,0,0.10)",
-        zIndex: 800, minWidth: 180,
+        boxShadow: "0 2px 20px rgba(0,0,0,0.10)", zIndex: 800, minWidth: 180,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#1abc9c" }} />
@@ -726,198 +806,218 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
         <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>
           Matching radius: <strong style={{ color: "#333" }}>2 km</strong>
         </div>
-        <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: "0.04em", marginBottom: 5 }}>
-          COMPATIBILITY
-        </div>
-        <div style={{
-          height: 4, borderRadius: 2,
-          background: "linear-gradient(to right, #FAD7D3, #C0392B)",
-          marginBottom: 4,
-        }} />
+        <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: "0.04em", marginBottom: 5 }}>COMPATIBILITY</div>
+        <div style={{ height: 4, borderRadius: 2, background: "linear-gradient(to right, #FAD7D3, #C0392B)", marginBottom: 4 }} />
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#aaa" }}>
           <span>40%</span><span>90%</span>
         </div>
       </div>
 
+      {/* ── Top-right info card ── */}
       <div style={{
         position: "absolute", top: 80, right: 20,
         background: "rgba(255,255,255,0.96)", backdropFilter: "blur(10px)",
         borderRadius: 20, padding: "18px 20px",
-        boxShadow: "0 2px 20px rgba(0,0,0,0.10)",
-        zIndex: 800, maxWidth: 240,
+        boxShadow: "0 2px 20px rgba(0,0,0,0.10)", zIndex: 800, maxWidth: 240,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
           <span style={{ color: "#C0392B", fontSize: 12 }}>✦</span>
-          <span style={{ fontSize: 12, color: "#C0392B", fontWeight: 600 }}>Mutual vibes only</span>
+          <span style={{ fontSize: 12, color: "#C0392B", fontWeight: 600 }}>find your freakquency</span>
         </div>
         <p style={{ fontSize: 15, lineHeight: 1.5, color: "#1a1a1a", fontWeight: 500, marginBottom: 6 }}>
-          The person next to you might be your{" "}
-          <span style={{ color: "#C0392B", fontWeight: 700 }}>people.</span>
+          The person next to you might be your <span style={{ color: "#C0392B", fontWeight: 700 }}>people.</span>
         </p>
-        <p style={{ fontSize: 13, color: "#888", marginBottom: 14, lineHeight: 1.5 }}>
-          You just don't know it yet.
-        </p>
-        <Link
-          href="/how-it-works"
-          style={{
-            background: "none", border: "none",
-            fontSize: 13, color: "#C0392B", fontWeight: 600,
-            cursor: "pointer", padding: 0, textDecoration: "none",
-          }}
-        >
-          How it works →
-        </Link>
+        <p style={{ fontSize: 13, color: "#888", marginBottom: 14, lineHeight: 1.5 }}>You just don't know it yet.</p>
+        <Link href="/how-it-works" style={{
+          background: "none", border: "none", fontSize: 13, color: "#C0392B",
+          fontWeight: 600, cursor: "pointer", padding: 0, textDecoration: "none",
+        }}>How it works →</Link>
       </div>
 
-      {selectedUser && (
+      {/* ── Profile Popup (context-aware) ── */}
+      {selectedUser && !chatPanelOpen && !inboxOpen && (
         <ProfilePopup
           user={selectedUser}
           onClose={() => setSelectedUser(null)}
           onChat={(uid) => {
             setSelectedUser(null);
             onChatRequest?.(uid);
-            const peer = HARDCODED_USERS.find((u) => u.uid === uid) ?? null;
-            setChatPeer(peer);
-            setChatOpen(true);
+            const peer = HARDCODED_USERS.find(u => u.uid === uid) ?? null;
+            setChatOverlayPeer(peer);
+            setChatOverlayOpen(true);
             if (myId && socket) {
               socket.emit("chat:request", { fromId: myId, toId: uid });
-              const cid = [myId, uid].sort().join(":");
-              setConversationId(cid);
-              setConversations((prev) => prev[cid] ? prev : { ...prev, [cid]: [] });
+              const cid = getConvoId(myId, uid);
+              setChatOverlayCid(cid);
+              setConversations(prev => prev[cid] ? prev : { ...prev, [cid]: [] });
+              setSentRequests(prev => ({ ...prev, [uid]: "" }));
+            }
+          }}
+          mode={popupMode}
+          pendingPreview={selectedUser ? getPendingFrom(selectedUser.uid)?.preview : undefined}
+          onAccept={() => {
+            if (!selectedUser || !socket || !myId) return;
+            const req = getPendingFrom(selectedUser.uid);
+            if (!req) return;
+            const cid = getConvoId(req.fromId, myId);
+            const peer = HARDCODED_USERS.find(u => u.uid === req.fromId);
+            socket.emit("chat:accept", { fromId: req.fromId, toId: myId, conversationId: cid, peerName: "You" });
+            const convo: AcceptedConvo = {
+              conversationId: cid, peerId: req.fromId, peerName: peer?.name ?? "Someone",
+              peerUid: req.fromId, similarity: peer?.similarity ?? 0,
+              sharedInterests: peer?.sharedInterests ?? [],
+            };
+            setAcceptedConvos(prev => [...prev, convo]);
+            setPendingRequests(prev => { const n = { ...prev }; delete n[req.fromId]; return n; });
+            setSelectedUser(null);
+            setActiveChatConvo(convo);
+            setChatPanelOpen(true);
+          }}
+          onDecline={() => {
+            if (!selectedUser) return;
+            setPendingRequests(prev => { const n = { ...prev }; delete n[selectedUser.uid]; return n; });
+            setSelectedUser(null);
+          }}
+          onGoToChat={() => {
+            if (!selectedUser) return;
+            const convo = getAcceptedConvo(selectedUser.uid);
+            if (convo) {
+              setActiveChatConvo(convo);
+              setChatPanelOpen(true);
+              setSelectedUser(null);
             }
           }}
         />
       )}
 
-      {/* Incoming chat request toast */}
-      {incomingRequest && (
-        <div
-          style={{
-            position: "absolute",
-            left: 20,
-            bottom: 24,
-            maxWidth: 260,
-            padding: "10px 12px",
-            borderRadius: 14,
-            background: "rgba(255,255,255,0.98)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-            zIndex: 900,
-            fontSize: 12,
+      {/* ── Pre-accept chat overlay (send opener, then disabled) ── */}
+      {chatOverlayOpen && chatOverlayPeer && !chatPanelOpen && (
+        <ChatOverlay
+          open={chatOverlayOpen}
+          onClose={() => setChatOverlayOpen(false)}
+          peer={chatOverlayPeer}
+          messages={chatOverlayCid ? conversations[chatOverlayCid] ?? [] : []}
+          myId={myId}
+          pendingIntro={(chatOverlayCid ? (conversations[chatOverlayCid] ?? []).length === 0 : true)}
+          canSendMore={chatOverlayCid ? (conversations[chatOverlayCid] ?? []).length === 0 : true}
+          onSend={(text) => {
+            if (!socket || !myId || !chatOverlayPeer) return;
+            const cid = chatOverlayCid ?? getConvoId(myId, chatOverlayPeer.uid);
+            const payload: ChatMessage = {
+              conversationId: cid, fromId: myId, toId: chatOverlayPeer.uid,
+              text, timestamp: Date.now(),
+            };
+            setChatOverlayCid(cid);
+            setConversations(prev => ({ ...prev, [cid]: [...(prev[cid] ?? []), payload] }));
+            socket.emit("chat:message", payload);
+            socket.emit("chat:request", { fromId: myId, toId: chatOverlayPeer.uid, preview: text });
+            setSentRequests(prev => ({ ...prev, [chatOverlayPeer.uid]: text }));
           }}
-        >
-          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-            Someone on your wavelength wants to chat.
-          </div>
-          {incomingRequest.preview && (
-            <div
-              style={{
-                fontSize: 11,
-                color: "#777",
-                marginBottom: 6,
-                padding: "4px 6px",
-                borderRadius: 8,
-                background: "#FFF5F4",
-              }}
-            >
-              “{incomingRequest.preview}”
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 6 }}>
-            <button
-              onClick={() => setIncomingRequest(null)}
-              style={{
-                flex: 1,
-                borderRadius: 999,
-                border: "1px solid rgba(0,0,0,0.12)",
-                background: "#fff",
-                padding: "5px 0",
-                fontSize: 11,
-                cursor: "pointer",
-              }}
-            >
-              Not now
-            </button>
-            <button
-              onClick={() => {
-                if (!socket || !myId || !incomingRequest) return;
-                socket.emit("chat:accept", {
-                  fromId: incomingRequest.fromId,
-                  toId: myId,
-                });
-                const peer =
-                  HARDCODED_USERS.find((u) => u.uid === incomingRequest.fromId) ??
-                  null;
-                setChatPeer(peer);
-                setChatOpen(true);
-              const cid = [incomingRequest.fromId, myId].sort().join(":");
-              setConversationId(cid);
-              setConversations((prev) => prev[cid] ? prev : { ...prev, [cid]: [] });
-                setIncomingRequest(null);
-              }}
-              style={{
-                flex: 1,
-                borderRadius: 999,
-                border: "none",
-                background: "#C0392B",
-                color: "#fff",
-                padding: "5px 0",
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Say hi back
-            </button>
-          </div>
-        </div>
+        />
       )}
 
-      <ChatOverlay
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
-        peer={chatPeer}
-        messages={
-          conversationId ? conversations[conversationId] ?? [] : []
-        }
+      {/* ── Side panel: full chat (post-accept) ── */}
+      <ChatPanel
+        open={chatPanelOpen && !!activeChatConvo}
+        onClose={() => { setChatPanelOpen(false); setActiveChatConvo(null); }}
+        peer={activeChatConvo}
+        messages={activeChatConvo ? conversations[activeChatConvo.conversationId] ?? [] : []}
         myId={myId}
-        pendingIntro={
-          !conversationId ||
-          !conversations[conversationId] ||
-          conversations[conversationId].length === 0
-        }
-        canSendMore={(function () {
-          if (!conversationId) return true;
-          const msgs = conversations[conversationId] ?? [];
-          const accepted = acceptedConversations[conversationId] ?? false;
-          if (accepted) return true;
-          // allow exactly one opener before accept
-          return msgs.length === 0;
-        })()}
         onSend={(text) => {
-          if (!socket || !myId || !chatPeer) return;
-          const cid =
-            conversationId ?? [myId, chatPeer.uid].sort().join(":");
+          if (!socket || !myId || !activeChatConvo) return;
           const payload: ChatMessage = {
-            conversationId: cid,
-            fromId: myId,
-            toId: chatPeer.uid,
-            text,
-            timestamp: Date.now(),
+            conversationId: activeChatConvo.conversationId, fromId: myId,
+            toId: activeChatConvo.peerUid, text, timestamp: Date.now(),
           };
-          setConversationId(cid);
-          setConversations((prev) => {
-            const existing = prev[cid] ?? [];
-            return { ...prev, [cid]: [...existing, payload] };
-          });
+          setConversations(prev => ({
+            ...prev,
+            [activeChatConvo.conversationId]: [...(prev[activeChatConvo.conversationId] ?? []), payload],
+          }));
           socket.emit("chat:message", payload);
-          // Also send / update the preview so the other side sees the latest opener
-          socket.emit("chat:request", {
-            fromId: myId,
-            toId: chatPeer.uid,
-            preview: text,
-          });
         }}
       />
+
+      {/* ── Inbox panel ── */}
+      <InboxPanel
+        open={inboxOpen && !chatPanelOpen}
+        onClose={() => setInboxOpen(false)}
+        convos={acceptedConvos}
+        messages={conversations}
+        onSelect={(c) => {
+          setActiveChatConvo(c);
+          setChatPanelOpen(true);
+          setInboxOpen(false);
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── ChatOverlay (kept for pre-accept opener — same as your original) ────────
+
+function ChatOverlay({ open, onClose, peer, messages, myId, onSend, pendingIntro, canSendMore }: {
+  open: boolean; onClose: () => void; peer: NearbyUser | null;
+  messages: ChatMessage[]; myId: string | null; onSend: (text: string) => void;
+  pendingIntro: boolean; canSendMore: boolean;
+}) {
+  const [draft, setDraft] = useState("");
+  if (!open || !peer || !myId) return null;
+
+  return (
+    <div style={{
+      position: "absolute", right: 20, bottom: 24, width: 280, maxHeight: 360,
+      background: "rgba(255,255,255,0.98)", borderRadius: 18,
+      boxShadow: "0 10px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column",
+      overflow: "hidden", zIndex: 900, fontFamily: "'DM Sans', system-ui, sans-serif",
+    }}>
+      <div style={{
+        padding: "10px 12px", borderBottom: "1px solid rgba(0,0,0,0.06)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>Send a message</div>
+          <div style={{ fontSize: 11, color: "#999" }}>They'll see it as a request</div>
+        </div>
+        <button onClick={onClose} style={{
+          border: "none", background: "transparent", fontSize: 16, color: "#bbb", cursor: "pointer",
+        }}>×</button>
+      </div>
+      <div style={{ flex: 1, padding: "8px 10px 6px", overflowY: "auto", fontSize: 12 }}>
+        {messages.length === 0 && (
+          <p style={{ margin: 0, padding: "6px 4px 10px", color: "#999" }}>
+            {pendingIntro ? "Send a first message. They'll see it with an option to say hi back." : "Waiting for them to accept…"}
+          </p>
+        )}
+        {messages.map((m) => {
+          const mine = m.fromId === myId;
+          return (
+            <div key={m.timestamp + m.fromId} style={{
+              display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 4,
+            }}>
+              <div style={{
+                maxWidth: "80%", padding: "6px 9px", borderRadius: 12, fontSize: 12, lineHeight: 1.4,
+                background: mine ? "#C0392B" : "#F5B8B0", color: mine ? "#fff" : "#5a1e1a",
+              }}>{m.text}</div>
+            </div>
+          );
+        })}
+      </div>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        if (!draft.trim() || !canSendMore) return;
+        onSend(draft.trim()); setDraft("");
+      }} style={{ padding: "6px 8px 8px", borderTop: "1px solid rgba(0,0,0,0.06)", display: "flex", gap: 6 }}>
+        <input value={draft} onChange={(e) => setDraft(e.target.value)}
+          placeholder={canSendMore ? "Send a quick hello…" : "Waiting for them to accept…"}
+          disabled={!canSendMore}
+          style={{ flex: 1, borderRadius: 999, border: "1px solid rgba(0,0,0,0.12)", padding: "6px 10px", fontSize: 12, outline: "none" }}
+        />
+        <button type="submit" style={{
+          borderRadius: 999, border: "none", padding: "6px 10px", fontSize: 11, fontWeight: 600,
+          background: "#C0392B", color: "#fff",
+          cursor: canSendMore ? "pointer" : "not-allowed", opacity: canSendMore ? 1 : 0.6,
+        }} disabled={!canSendMore}>Send</button>
+      </form>
     </div>
   );
 }
