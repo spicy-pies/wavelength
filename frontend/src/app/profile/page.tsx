@@ -469,7 +469,7 @@ export default function ProfilePage() {
           wave~length
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <Link href="/discover" style={styles.link}>
+          <Link href="/map" style={styles.link}>
             discover
           </Link>
           <button type="button" onClick={handleSignOut} style={styles.signOut}>
