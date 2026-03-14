@@ -57,7 +57,7 @@ Track implementation steps here. Update this file after every meaningful change.
 ## 6. Geolocation & real-time
 
 - [ ] navigator.geolocation (getCurrentPosition / watch), anonymised coords
-- [ ] Backend: nearby query within 2 km, no exact location exposed
+- [ ] Backend: nearby query within 1 km, no exact location exposed
 - [ ] Socket.io: client sends location + UUID; server pushes match updates
 
 ---

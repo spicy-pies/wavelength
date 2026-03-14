@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import { io, Socket } from "socket.io-client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,19 @@ const HARDCODED_USERS: NearbyUser[] = [
   { uid: "user-6", similarity: 0.46, lat: -33.8810, lng: 151.1980, sharedInterests: ["James Blake", "Celeste", "Skins"] },
   { uid: "user-7", similarity: 0.63, lat: -33.8770, lng: 151.2230, sharedInterests: ["FKA Twigs", "Outer Wilds", "Twin Peaks"] },
 ];
+
+type ChatMessage = {
+  conversationId: string;
+  fromId: string;
+  toId: string;
+  text: string;
+  timestamp: number;
+};
+
+type IncomingRequest = {
+  fromId: string;
+  preview?: string;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -101,15 +115,24 @@ function injectStyles() {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-5px); }
     }
-    .wl-heart:hover {
-      transform: scale(1.18) !important;
-      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1) !important;
+    .wl-heart img {
+      transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .wl-heart:hover img {
+      transform: scale(1.08);
     }
     .leaflet-marker-icon.leaflet-wavelength-heart {
       width: ${HEART_SIZE_MAX}px !important;
       height: ${HEART_SIZE_MAX}px !important;
       margin-left: -${HEART_SIZE_MAX / 2}px !important;
       margin-top: -${HEART_SIZE_MAX / 2}px !important;
+    }
+    .leaflet-marker-icon.leaflet-wavelength-heart.wl-heart-selected .wl-heart {
+      box-shadow: 0 0 0 6px rgba(192,57,43,0.14), 0 10px 26px rgba(0,0,0,0.22);
+      border-radius: 50%;
+    }
+    .leaflet-marker-icon.leaflet-wavelength-heart.wl-heart-selected .wl-heart img {
+      transform: scale(1.12);
     }
   `;
   document.head.appendChild(s);
@@ -245,6 +268,192 @@ function ProfilePopup({ user, onClose, onChat }: {
   );
 }
 
+// ─── Chat Overlay ─────────────────────────────────────────────────────────────
+
+function ChatOverlay({
+  open,
+  onClose,
+  peer,
+  messages,
+  myId,
+  onSend,
+  pendingIntro,
+  canSendMore,
+}: {
+  open: boolean;
+  onClose: () => void;
+  peer: NearbyUser | null;
+  messages: ChatMessage[];
+  myId: string | null;
+  onSend: (text: string) => void;
+  pendingIntro: boolean;
+  canSendMore: boolean;
+}) {
+  const [draft, setDraft] = useState("");
+
+  if (!open || !peer || !myId) return null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        right: 20,
+        bottom: 24,
+        width: 280,
+        maxHeight: 360,
+        background: "rgba(255,255,255,0.98)",
+        borderRadius: 18,
+        boxShadow: "0 10px 40px rgba(0,0,0,0.18)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        zIndex: 900,
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          padding: "10px 12px",
+          borderBottom: "1px solid rgba(0,0,0,0.06)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#1a1a1a",
+            }}
+          >
+            Chat on wavelength
+          </div>
+          <div style={{ fontSize: 11, color: "#999" }}>
+            {peer.name ?? "Someone nearby"}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            border: "none",
+            background: "transparent",
+            fontSize: 16,
+            color: "#bbb",
+            cursor: "pointer",
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          padding: "8px 10px 6px",
+          overflowY: "auto",
+          fontSize: 12,
+        }}
+      >
+        {messages.length === 0 && (
+          <p
+            style={{
+              margin: 0,
+              padding: "6px 4px 10px",
+              color: "#999",
+            }}
+          >
+            {pendingIntro
+              ? "Send a first message. They’ll see it with an option to say hi back."
+              : canSendMore
+              ? "No messages yet. Say hi!"
+              : "Waiting for them to accept your request."}
+          </p>
+        )}
+        {messages.map((m) => {
+          const mine = m.fromId === myId;
+          return (
+            <div
+              key={m.timestamp + m.fromId}
+              style={{
+                display: "flex",
+                justifyContent: mine ? "flex-end" : "flex-start",
+                marginBottom: 4,
+              }}
+            >
+              <div
+                style={{
+                  maxWidth: "80%",
+                  padding: "6px 9px",
+                  borderRadius: 12,
+                  fontSize: 12,
+                  lineHeight: 1.4,
+                  background: mine ? "#C0392B" : "#F5B8B0",
+                  color: mine ? "#fff" : "#5a1e1a",
+                }}
+              >
+                {m.text}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!draft.trim() || !canSendMore) return;
+          onSend(draft.trim());
+          setDraft("");
+        }}
+        style={{
+          padding: "6px 8px 8px",
+          borderTop: "1px solid rgba(0,0,0,0.06)",
+          display: "flex",
+          gap: 6,
+        }}
+      >
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={
+            canSendMore
+              ? "Send a quick hello…"
+              : "Waiting for them to accept…"
+          }
+          disabled={!canSendMore}
+          style={{
+            flex: 1,
+            borderRadius: 999,
+            border: "1px solid rgba(0,0,0,0.12)",
+            padding: "6px 10px",
+            fontSize: 12,
+            outline: "none",
+          }}
+        />
+        <button
+          type="submit"
+          style={{
+            borderRadius: 999,
+            border: "none",
+            padding: "6px 10px",
+            fontSize: 11,
+            fontWeight: 600,
+            background: "#C0392B",
+            color: "#fff",
+            cursor: canSendMore ? "pointer" : "not-allowed",
+            opacity: canSendMore ? 1 : 0.6,
+          }}
+          disabled={!canSendMore}
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: string) => void }) {
@@ -252,6 +461,14 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
   const mapInstanceRef = useRef<any>(null);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [myId, setMyId] = useState<string | null>(null);
+  const [chatPeer, setChatPeer] = useState<NearbyUser | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [conversations, setConversations] = useState<Record<string, ChatMessage[]>>({});
+  const [incomingRequest, setIncomingRequest] = useState<IncomingRequest | null>(null);
+  const [acceptedConversations, setAcceptedConversations] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -268,6 +485,56 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
     script.onload = () => setLeafletLoaded(true);
     document.head.appendChild(script);
   }, []);
+
+  // Assign a stable anonymous id for this browser
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const KEY = "wavelength:anonUserId";
+    let stored = window.localStorage.getItem(KEY);
+    if (!stored) {
+      stored = window.crypto.randomUUID();
+      window.localStorage.setItem(KEY, stored);
+    }
+    setMyId(stored);
+  }, []);
+
+  // Connect socket.io for chat
+  useEffect(() => {
+    if (!myId) return;
+    const url = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:3001";
+    const s = io(url, { transports: ["websocket"] });
+    setSocket(s);
+    s.emit("register", { userId: myId });
+
+    s.on("chat:incoming", (payload: IncomingRequest) => {
+      setIncomingRequest(payload);
+    });
+
+    s.on("chat:accepted", (payload: { conversationId: string; peerId: string }) => {
+      const peer = HARDCODED_USERS.find((u) => u.uid === payload.peerId) ?? null;
+      setChatPeer(peer);
+      setConversationId(payload.conversationId);
+      setChatOpen(true);
+      setAcceptedConversations((prev) => ({
+        ...prev,
+        [payload.conversationId]: true,
+      }));
+    });
+
+    s.on("chat:message", (payload: ChatMessage) => {
+      setConversations((prev) => {
+        const existing = prev[payload.conversationId] ?? [];
+        return {
+          ...prev,
+          [payload.conversationId]: [...existing, payload],
+        };
+      });
+    });
+
+    return () => {
+      s.disconnect();
+    };
+  }, [myId]);
 
   useEffect(() => {
     if (!leafletLoaded || !mapRef.current || mapInstanceRef.current) return;
@@ -286,7 +553,27 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
     mapInstanceRef.current = map;
+
+    // Clicking on empty map clears selection + closes chat
+    map.on("click", () => {
+      setSelectedUser(null);
+      setChatPeer(null);
+      setChatOpen(false);
+      setConversationId(null);
+      // Clear visual selection halo when clicking empty map
+      const existing = document.querySelectorAll(".leaflet-wavelength-heart.wl-heart-selected");
+      existing.forEach((el) => el.classList.remove("wl-heart-selected"));
+    });
   }, [leafletLoaded]);
+
+  // When selectedUser is cleared (e.g. via popup close button),
+  // also remove the halo on any heart.
+  useEffect(() => {
+    if (selectedUser) return;
+    if (typeof document === "undefined") return;
+    const existing = document.querySelectorAll(".leaflet-wavelength-heart.wl-heart-selected");
+    existing.forEach((el) => el.classList.remove("wl-heart-selected"));
+  }, [selectedUser]);
 
   const redrawMarkers = useCallback(() => {
     const L = (window as any).L;
@@ -351,7 +638,26 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
       });
       const marker = L.marker([user.lat, user.lng], { icon: heartIcon });
       marker._wavelength = true;
-      marker.on("click", () => setSelectedUser(user));
+      marker.on("click", () => {
+        // Clear selection on any existing hearts
+        const existing = document.querySelectorAll(".leaflet-wavelength-heart.wl-heart-selected");
+        existing.forEach((el) => el.classList.remove("wl-heart-selected"));
+
+        const iconEl = (marker as any)._icon as HTMLElement | null;
+        if (iconEl) {
+          iconEl.classList.add("wl-heart-selected");
+        }
+
+        // Smoothly focus map toward this heart
+        const targetZoom = Math.max(map.getZoom(), 16);
+        map.setView([user.lat, user.lng], targetZoom, { animate: true });
+
+        // Switch selection + close any previous chat/conversation until user starts again
+        setSelectedUser(user);
+        setChatPeer(null);
+        setChatOpen(false);
+        setConversationId(null);
+      });
       marker.addTo(map);
     });
   }, []);
@@ -470,9 +776,148 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
           onChat={(uid) => {
             setSelectedUser(null);
             onChatRequest?.(uid);
+            const peer = HARDCODED_USERS.find((u) => u.uid === uid) ?? null;
+            setChatPeer(peer);
+            setChatOpen(true);
+            if (myId && socket) {
+              socket.emit("chat:request", { fromId: myId, toId: uid });
+              const cid = [myId, uid].sort().join(":");
+              setConversationId(cid);
+              setConversations((prev) => prev[cid] ? prev : { ...prev, [cid]: [] });
+            }
           }}
         />
       )}
+
+      {/* Incoming chat request toast */}
+      {incomingRequest && (
+        <div
+          style={{
+            position: "absolute",
+            left: 20,
+            bottom: 24,
+            maxWidth: 260,
+            padding: "10px 12px",
+            borderRadius: 14,
+            background: "rgba(255,255,255,0.98)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+            zIndex: 900,
+            fontSize: 12,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+            Someone on your wavelength wants to chat.
+          </div>
+          {incomingRequest.preview && (
+            <div
+              style={{
+                fontSize: 11,
+                color: "#777",
+                marginBottom: 6,
+                padding: "4px 6px",
+                borderRadius: 8,
+                background: "#FFF5F4",
+              }}
+            >
+              “{incomingRequest.preview}”
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => setIncomingRequest(null)}
+              style={{
+                flex: 1,
+                borderRadius: 999,
+                border: "1px solid rgba(0,0,0,0.12)",
+                background: "#fff",
+                padding: "5px 0",
+                fontSize: 11,
+                cursor: "pointer",
+              }}
+            >
+              Not now
+            </button>
+            <button
+              onClick={() => {
+                if (!socket || !myId || !incomingRequest) return;
+                socket.emit("chat:accept", {
+                  fromId: incomingRequest.fromId,
+                  toId: myId,
+                });
+                const peer =
+                  HARDCODED_USERS.find((u) => u.uid === incomingRequest.fromId) ??
+                  null;
+                setChatPeer(peer);
+                setChatOpen(true);
+              const cid = [incomingRequest.fromId, myId].sort().join(":");
+              setConversationId(cid);
+              setConversations((prev) => prev[cid] ? prev : { ...prev, [cid]: [] });
+                setIncomingRequest(null);
+              }}
+              style={{
+                flex: 1,
+                borderRadius: 999,
+                border: "none",
+                background: "#C0392B",
+                color: "#fff",
+                padding: "5px 0",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Say hi back
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ChatOverlay
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        peer={chatPeer}
+        messages={
+          conversationId ? conversations[conversationId] ?? [] : []
+        }
+        myId={myId}
+        pendingIntro={
+          !conversationId ||
+          !conversations[conversationId] ||
+          conversations[conversationId].length === 0
+        }
+        canSendMore={(function () {
+          if (!conversationId) return true;
+          const msgs = conversations[conversationId] ?? [];
+          const accepted = acceptedConversations[conversationId] ?? false;
+          if (accepted) return true;
+          // allow exactly one opener before accept
+          return msgs.length === 0;
+        })()}
+        onSend={(text) => {
+          if (!socket || !myId || !chatPeer) return;
+          const cid =
+            conversationId ?? [myId, chatPeer.uid].sort().join(":");
+          const payload: ChatMessage = {
+            conversationId: cid,
+            fromId: myId,
+            toId: chatPeer.uid,
+            text,
+            timestamp: Date.now(),
+          };
+          setConversationId(cid);
+          setConversations((prev) => {
+            const existing = prev[cid] ?? [];
+            return { ...prev, [cid]: [...existing, payload] };
+          });
+          socket.emit("chat:message", payload);
+          // Also send / update the preview so the other side sees the latest opener
+          socket.emit("chat:request", {
+            fromId: myId,
+            toId: chatPeer.uid,
+            preview: text,
+          });
+        }}
+      />
     </div>
   );
 }
