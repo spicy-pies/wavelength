@@ -131,9 +131,11 @@ type Props = {
   section: InterestSection;
   selected: string[];
   onChange: (items: string[]) => void;
+  /** When true, omit the section label/optional header (e.g. when used inside a dropdown that already shows the category). */
+  hideLabel?: boolean;
 };
 
-export function SearchSection({ section, selected, onChange }: Props) {
+export function SearchSection({ section, selected, onChange, hideLabel }: Props) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -246,10 +248,12 @@ export function SearchSection({ section, selected, onChange }: Props) {
 
   return (
     <div style={styles.section}>
-      <div style={styles.header}>
-        <h3 style={styles.label}>{section.label}</h3>
-        <span style={styles.optionalBadge}>optional</span>
-      </div>
+      {!hideLabel && (
+        <div style={styles.header}>
+          <h3 style={styles.label}>{section.label}</h3>
+          <span style={styles.optionalBadge}>optional</span>
+        </div>
+      )}
 
       <div style={styles.inputWrap}>
         <div style={styles.inputRow}>

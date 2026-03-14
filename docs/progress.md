@@ -18,7 +18,7 @@ Track implementation steps here. Update this file after every meaningful change.
 - [x] Pastel cream/white layout, Wavelength logo/branding
 - [x] Hero section, nav (Discover, Connections, Profile)
 - [x] Full landing screen: blobs, sine waves, “your people are closer than you think”, how-it-works cards, CTA → profile
-- [ ] Optional: starfield / globe (design direction)
+- [x] Optional: map-themed background treatment (design direction)
 
 ---
 
@@ -115,4 +115,4 @@ Track implementation steps here. Update this file after every meaningful change.
 
 ---
 
-*Last updated: Profile page now has first-time setup vs returning-user display/edit flows.*
+*Last updated: Landing page hero now uses soft white glow shadows over the map background so text and CTA pop without feeling heavy.*

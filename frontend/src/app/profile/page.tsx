@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
 import type { SectionData, InterestSectionId } from "@/types/database";
 import { SearchSection } from "@/components/profile/SearchSection";
@@ -36,6 +37,8 @@ const styles = {
     background: "#fdf8f6",
     fontFamily: "'Plus Jakarta Sans', sans-serif",
     padding: "2rem",
+    position: "relative" as const,
+    overflow: "hidden",
   },
   nav: {
     display: "flex",
@@ -44,6 +47,13 @@ const styles = {
     marginBottom: "2rem",
     flexWrap: "wrap" as const,
     gap: "1rem",
+    padding: "0.85rem 1.25rem",
+    borderRadius: 999,
+    border: "1px solid rgba(220,180,180,0.35)",
+    background: "rgba(253,248,246,0.9)",
+    backdropFilter: "blur(10px)",
+    position: "relative" as const,
+    zIndex: 2,
   },
   title: {
     fontFamily: "'Playfair Display', serif",
@@ -51,13 +61,23 @@ const styles = {
     fontWeight: 700,
     color: "#3a1a1a",
   },
+  cardWrap: {
+    display: "flex",
+    justifyContent: "center",
+    marginTop: "1.5rem",
+    position: "relative" as const,
+    zIndex: 2,
+  },
   card: {
-    maxWidth: 560,
-    background: "white",
-    borderRadius: 16,
-    boxShadow: "0 4px 24px rgba(224, 96, 96, 0.08)",
-    padding: "2rem",
-    border: "1px solid #f0e0dc",
+    width: "100%",
+    maxWidth: 640,
+    background: "#ffffff",
+    borderRadius: 20,
+    boxShadow: "0 16px 60px rgba(224, 96, 96, 0.14)",
+    padding: "2.25rem 2rem 2rem",
+    border: "1px solid rgba(240, 210, 205, 0.9)",
+    position: "relative" as const,
+    overflow: "hidden",
   },
   subtitle: {
     fontSize: "0.875rem",
@@ -116,7 +136,7 @@ const styles = {
   },
   buttonSecondary: {
     background: "#f5e6e6",
-    color: "#b06060",
+    color: "#7a4545",
   },
   backLink: {
     display: "inline-block",
@@ -198,6 +218,80 @@ const styles = {
     gap: "0.75rem",
     marginTop: "1.25rem",
   },
+  stepper: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "0.75rem",
+    marginBottom: "1.5rem",
+    fontSize: "0.75rem",
+    color: "#b08080",
+  },
+  pill: {
+    padding: "0.25rem 0.7rem",
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.75)",
+    border: "1px solid rgba(240,210,205,0.9)",
+    fontSize: "0.72rem",
+    fontWeight: 600,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.12em",
+    color: "#e08080",
+  },
+  stepperTrack: {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "0.75rem",
+  },
+  stepDot: {
+    width: 9,
+    height: 9,
+    borderRadius: "50%",
+    background: "rgba(230, 140, 140, 0.45)",
+  },
+  stepDotActive: {
+    background: "#e06060",
+    boxShadow: "0 0 0 6px rgba(224,96,96,0.18)",
+  },
+  stepLabel: {
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    color: "#b08080",
+  },
+  backgroundBlob: {
+    position: "absolute" as const,
+    borderRadius: "50%",
+    filter: "blur(60px)",
+    opacity: 0.25,
+    pointerEvents: "none" as const,
+    zIndex: 1,
+  },
+  interestDropdown: {
+    borderRadius: 12,
+    border: "1px solid #f0e0dc",
+    background: "#fffaf8",
+    padding: "0.35rem 0.85rem 0.7rem",
+    marginBottom: "0.75rem",
+  },
+  interestDropdownSummary: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "0.5rem",
+    listStyle: "none",
+    cursor: "pointer",
+  },
+  interestDropdownTitle: {
+    fontSize: "0.88rem",
+    fontWeight: 600,
+    color: "#4a2727",
+  },
+  interestDropdownHint: {
+    fontSize: "0.78rem",
+    color: "#b08080",
+  },
 };
 
 export default function ProfilePage() {
@@ -216,6 +310,13 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const currentStep =
+    mode === "setup-basics" || mode === "edit-basics"
+      ? 1
+      : mode === "setup-interests" || mode === "edit-interests"
+      ? 2
+      : 0;
 
   const loadProfile = useCallback(async () => {
     const supabase = createClient();
@@ -424,13 +525,41 @@ export default function ProfilePage() {
           href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <div
+          style={{
+            ...styles.backgroundBlob,
+            width: 320,
+            height: 320,
+            top: -80,
+            right: -60,
+            background: "#f9d0d0",
+          }}
+        />
+        <div
+          style={{
+            ...styles.backgroundBlob,
+            width: 260,
+            height: 260,
+            top: "45%",
+            left: -80,
+            background: "#fce0c8",
+          }}
+        />
+
         <nav style={styles.nav}>
           <Link href="/" style={{ ...styles.link, fontWeight: 600 }}>
             wave~length
           </Link>
         </nav>
-        <div style={styles.card}>
-          <p style={styles.subtitle}>Loading profile…</p>
+        <div style={styles.cardWrap}>
+          <motion.div
+            style={styles.card}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <p style={styles.subtitle}>Loading profile…</p>
+          </motion.div>
         </div>
       </div>
     );
@@ -443,16 +572,46 @@ export default function ProfilePage() {
           href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <div
+          style={{
+            ...styles.backgroundBlob,
+            width: 320,
+            height: 320,
+            top: -80,
+            right: -60,
+            background: "#f9d0d0",
+          }}
+        />
+        <div
+          style={{
+            ...styles.backgroundBlob,
+            width: 260,
+            height: 260,
+            top: "45%",
+            left: -80,
+            background: "#fce0c8",
+          }}
+        />
+
         <nav style={styles.nav}>
           <Link href="/" style={{ ...styles.link, fontWeight: 600 }}>
             wave~length
           </Link>
         </nav>
-        <div style={styles.card}>
-          <p style={styles.subtitle}>You’re not signed in.</p>
-          <Link href="/signin" style={styles.link}>
-            Sign in
-          </Link>
+        <div style={styles.cardWrap}>
+          <motion.div
+            style={styles.card}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <p style={styles.subtitle}>You’re not signed in.</p>
+            <div style={{ marginTop: "1rem" }}>
+              <Link href="/signin" style={styles.link}>
+                Sign in
+              </Link>
+            </div>
+          </motion.div>
         </div>
       </div>
     );
@@ -464,6 +623,38 @@ export default function ProfilePage() {
         href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet"
       />
+
+      <div
+        style={{
+          ...styles.backgroundBlob,
+          width: 320,
+          height: 320,
+          top: -80,
+          right: -60,
+          background: "#f9d0d0",
+        }}
+      />
+      <div
+        style={{
+          ...styles.backgroundBlob,
+          width: 260,
+          height: 260,
+          top: "45%",
+          left: -80,
+          background: "#fce0c8",
+        }}
+      />
+      <div
+        style={{
+          ...styles.backgroundBlob,
+          width: 200,
+          height: 200,
+          bottom: "14%",
+          right: "10%",
+          background: "#f5c8e0",
+        }}
+      />
+
       <nav style={styles.nav}>
         <Link href="/" style={{ ...styles.link, fontWeight: 600 }}>
           wave~length
@@ -478,219 +669,321 @@ export default function ProfilePage() {
         </div>
       </nav>
 
-      <div style={styles.card}>
-        <div style={styles.profileHeader}>
-          <h1 style={styles.title}>Profile</h1>
-          {mode === "setup-basics" && (
-            <p style={styles.subtitle}>
-              Start with the basics. You can add interests next.
-            </p>
-          )}
-          {mode === "setup-interests" && (
-            <p style={styles.subtitle}>
-              Add interests by category. Type and press Enter or click Add; suggestions may appear when available.
-            </p>
-          )}
-          {mode === "display" && (
-            <p style={styles.subtitle}>This is how you appear on Wavelength.</p>
-          )}
-          {mode === "edit-basics" && (
-            <p style={styles.subtitle}>Update your basic details. Changes save for your profile.</p>
-          )}
-          {mode === "edit-interests" && (
-            <p style={styles.subtitle}>Tweak your interests by category. Add or remove anything that no longer fits.</p>
-          )}
-        </div>
+      <div style={styles.cardWrap}>
+        <motion.div
+          style={styles.card}
+          initial={{ opacity: 0, y: 16, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.35 }}
+        >
+          <div style={styles.profileHeader}>
+            <h1 style={styles.title}>Profile</h1>
 
-        {error && <p style={styles.error}>{error}</p>}
-        {success && <p style={styles.success}>Profile saved.</p>}
-
-        {(mode === "setup-basics" || mode === "edit-basics") && (
-          <div style={styles.form}>
-            <div>
-              <label htmlFor="name" style={styles.label}>
-                Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                placeholder="Your name"
-                style={styles.input}
-                autoComplete="name"
-              />
+            <div style={styles.stepper}>
+              <span style={styles.pill}>
+                {currentStep === 0 ? "profile" : `step ${currentStep} of 2`}
+              </span>
+              <div style={styles.stepperTrack}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...styles.stepDot,
+                        ...(mode === "setup-basics" ||
+                        mode === "edit-basics" ||
+                        mode === "display"
+                          ? styles.stepDotActive
+                          : {}),
+                      }}
+                    />
+                    <span style={styles.stepLabel}>Basics</span>
+                  </div>
+                </div>
+                <div style={{ height: 1, flex: 1, background: "rgba(224, 96, 96, 0.18)" }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...styles.stepDot,
+                        ...(mode === "setup-interests" ||
+                        mode === "edit-interests" ||
+                        mode === "display"
+                          ? styles.stepDotActive
+                          : {}),
+                      }}
+                    />
+                    <span style={styles.stepLabel}>Interests</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <label htmlFor="age" style={styles.label}>
-                Age (18+)
-              </label>
-              <input
-                id="age"
-                type="number"
-                min={18}
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
-                placeholder="e.g. 25"
-                style={styles.input}
-              />
-            </div>
-            <div>
-              <label htmlFor="email" style={styles.label}>
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="you@example.com"
-                style={styles.input}
-                autoComplete="email"
-              />
-            </div>
-            {step1Error && <p style={styles.error}>{step1Error}</p>}
 
             {mode === "setup-basics" && (
-              <button
-                type="button"
-                onClick={handleContinueToInterests}
-                style={{ ...styles.button, ...styles.buttonPrimary }}
-              >
-                Continue to interests →
-              </button>
+              <p style={styles.subtitle}>
+                Start with the basics so your matches feel human. You can always adjust these later.
+              </p>
             )}
-
+            {mode === "setup-interests" && (
+              <p style={styles.subtitle}>
+                Add interests by category. Type and press Enter or click Add; suggestions may appear
+                when available.
+              </p>
+            )}
+            {mode === "display" && (
+              <p style={styles.subtitle}>This is how you appear on Wavelength right now.</p>
+            )}
             {mode === "edit-basics" && (
-              <div style={styles.buttonRow}>
-                <button
-                  type="button"
-                  onClick={handleSaveBasics}
-                  style={{ ...styles.button, ...styles.buttonPrimary }}
-                  disabled={saving}
-                >
-                  {saving ? "Saving…" : "Save basics"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelEditBasics}
-                  style={{ ...styles.button, ...styles.buttonSecondary }}
-                >
-                  Cancel
-                </button>
-              </div>
+              <p style={styles.subtitle}>Update your basic details. Keep things simple and honest.</p>
+            )}
+            {mode === "edit-interests" && (
+              <p style={styles.subtitle}>
+                Tweak your interests by category. Add what energises you; remove what no longer fits.
+              </p>
             )}
           </div>
-        )}
 
-        {(mode === "setup-interests" || mode === "edit-interests") && (
-          <>
-            {mode === "setup-interests" && (
-              <button
-                type="button"
-                onClick={() => setMode("setup-basics")}
-                style={styles.backLink}
+          {error && <p style={styles.error}>{error}</p>}
+          {success && <p style={styles.success}>Profile saved.</p>}
+
+          <AnimatePresence mode="wait">
+            {(mode === "setup-basics" || mode === "edit-basics") && (
+              <motion.div
+                key={mode}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18 }}
               >
-                ← Back to name, age, email
-              </button>
+                <div style={styles.form}>
+                  <div>
+                    <label htmlFor="name" style={styles.label}>
+                      Name
+                    </label>
+                    <input
+                      id="name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      placeholder="Your name"
+                      style={styles.input}
+                      autoComplete="name"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="age" style={styles.label}>
+                      Age (18+)
+                    </label>
+                    <input
+                      id="age"
+                      type="number"
+                      min={18}
+                      value={age}
+                      onChange={(e) => setAge(e.target.value)}
+                      placeholder="e.g. 25"
+                      style={styles.input}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="email" style={styles.label}>
+                      Email
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="you@example.com"
+                      style={styles.input}
+                      autoComplete="email"
+                    />
+                  </div>
+                  {step1Error && <p style={styles.error}>{step1Error}</p>}
+
+                  {mode === "setup-basics" && (
+                    <button
+                      type="button"
+                      onClick={handleContinueToInterests}
+                      style={{ ...styles.button, ...styles.buttonPrimary }}
+                    >
+                      Continue to interests →
+                    </button>
+                  )}
+
+                  {mode === "edit-basics" && (
+                    <div style={styles.buttonRow}>
+                      <button
+                        type="button"
+                        onClick={handleSaveBasics}
+                        style={{ ...styles.button, ...styles.buttonPrimary }}
+                        disabled={saving}
+                      >
+                        {saving ? "Saving…" : "Save basics"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEditBasics}
+                        style={{ ...styles.button, ...styles.buttonSecondary }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
             )}
 
-            <form onSubmit={handleSubmit} style={styles.form}>
-              <div>
-                <label style={styles.label}>Interests</label>
-                {INTEREST_SECTIONS.map((section) => (
-                  <SearchSection
-                    key={section.id}
-                    section={section}
-                    selected={sectionData[section.id as InterestSectionId] ?? []}
-                    onChange={(items) => handleSectionChange(section.id as InterestSectionId, items)}
-                  />
-                ))}
-              </div>
-
-              <div style={styles.buttonRow}>
-                <button
-                  type="submit"
-                  style={{ ...styles.button, ...styles.buttonPrimary }}
-                  disabled={saving}
-                >
-                  {saving ? "Saving…" : "Save profile"}
-                </button>
-                {mode === "edit-interests" && (
+            {(mode === "setup-interests" || mode === "edit-interests") && (
+              <motion.div
+                key={mode}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18 }}
+              >
+                {mode === "setup-interests" && (
                   <button
                     type="button"
-                    onClick={handleCancelEditInterests}
-                    style={{ ...styles.button, ...styles.buttonSecondary }}
+                    onClick={() => setMode("setup-basics")}
+                    style={styles.backLink}
                   >
-                    Cancel
+                    ← Back to name, age, email
                   </button>
                 )}
-              </div>
-            </form>
-          </>
-        )}
 
-        {mode === "display" && (
-          <>
-            <div>
-              <div style={styles.profileRow}>
-                <div style={styles.profileLabel}>Name</div>
-                <div style={styles.profileValue}>{name || "—"}</div>
-              </div>
-              <div style={styles.profileRow}>
-                <div style={styles.profileLabel}>Age</div>
-                <div style={styles.profileValue}>{age || "—"}</div>
-              </div>
-              <div style={styles.profileRow}>
-                <div style={styles.profileLabel}>Email</div>
-                <div style={styles.profileValue}>{email || "—"}</div>
-              </div>
-            </div>
-
-            <div>
-              {INTEREST_SECTIONS.map((section) => {
-                const items = sectionData[section.id as InterestSectionId] ?? [];
-                return (
-                  <div key={section.id} style={styles.interestGroup}>
-                    <div style={styles.interestGroupHeader}>
-                      <span style={styles.interestGroupTitle}>{section.label}</span>
-                    </div>
-                    {items.length ? (
-                      <div style={styles.interestTags}>
-                        {items.map((item) => (
-                          <span key={item} style={styles.interestTag}>
-                            {item}
+                <form onSubmit={handleSubmit} style={styles.form}>
+                  <div>
+                    <label style={styles.label}>Interests</label>
+                    {INTEREST_SECTIONS.map((section, idx) => (
+                      <details
+                        key={section.id}
+                        style={styles.interestDropdown}
+                        open={idx === 0}
+                      >
+                        <summary style={styles.interestDropdownSummary}>
+                          <span style={styles.interestDropdownTitle}>{section.label}</span>
+                          <span style={styles.interestDropdownHint}>
+                            {sectionData[section.id as InterestSectionId]?.length
+                              ? `${sectionData[section.id as InterestSectionId]!.length} added`
+                              : "click to add"}
                           </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={styles.interestEmpty}>No {section.label.toLowerCase()} added yet.</div>
+                        </summary>
+                        <SearchSection
+                          section={section}
+                          selected={sectionData[section.id as InterestSectionId] ?? []}
+                          onChange={(items) =>
+                            handleSectionChange(section.id as InterestSectionId, items)
+                          }
+                          hideLabel
+                        />
+                      </details>
+                    ))}
+                  </div>
+
+                  <div style={styles.buttonRow}>
+                    <button
+                      type="submit"
+                      style={{ ...styles.button, ...styles.buttonPrimary }}
+                      disabled={saving}
+                    >
+                      {saving ? "Saving…" : "Save profile"}
+                    </button>
+                    {mode === "edit-interests" && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEditInterests}
+                        style={{ ...styles.button, ...styles.buttonSecondary }}
+                      >
+                        Cancel
+                      </button>
                     )}
                   </div>
-                );
-              })}
-            </div>
+                </form>
+              </motion.div>
+            )}
 
-            <div style={styles.buttonRow}>
-              <button
-                type="button"
-                style={{ ...styles.button, ...styles.buttonPrimary }}
-                onClick={() => setMode("edit-basics")}
+            {mode === "display" && (
+              <motion.div
+                key={mode}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18 }}
               >
-                Edit basics
-              </button>
-              <button
-                type="button"
-                style={{ ...styles.button, ...styles.buttonSecondary }}
-                onClick={() => setMode("edit-interests")}
-              >
-                Edit interests
-              </button>
-            </div>
-          </>
-        )}
+                <div>
+                  <div style={styles.profileRow}>
+                    <div style={styles.profileLabel}>Name</div>
+                    <div style={styles.profileValue}>{name || "—"}</div>
+                  </div>
+                  <div style={styles.profileRow}>
+                    <div style={styles.profileLabel}>Age</div>
+                    <div style={styles.profileValue}>{age || "—"}</div>
+                  </div>
+                  <div style={styles.profileRow}>
+                    <div style={styles.profileLabel}>Email</div>
+                    <div style={styles.profileValue}>{email || "—"}</div>
+                  </div>
+                </div>
+
+                <div>
+                  {INTEREST_SECTIONS.map((section) => {
+                    const items = sectionData[section.id as InterestSectionId] ?? [];
+                    return (
+                      <div key={section.id} style={styles.interestGroup}>
+                        <div style={styles.interestGroupHeader}>
+                          <span style={styles.interestGroupTitle}>{section.label}</span>
+                        </div>
+                        {items.length ? (
+                          <div style={styles.interestTags}>
+                            {items.map((item) => (
+                              <span key={item} style={styles.interestTag}>
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={styles.interestEmpty}>
+                            No {section.label.toLowerCase()} added yet.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={styles.buttonRow}>
+                  <button
+                    type="button"
+                    style={{ ...styles.button, ...styles.buttonPrimary }}
+                    onClick={() => setMode("edit-basics")}
+                  >
+                    Edit basics
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...styles.button, ...styles.buttonSecondary }}
+                    onClick={() => setMode("edit-interests")}
+                  >
+                    Edit interests
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
     </div>
   );
