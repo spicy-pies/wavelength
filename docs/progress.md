@@ -22,11 +22,25 @@ Track implementation steps here. Update this file after every meaningful change.
 
 ---
 
+## 2.5 Authentication (Supabase Auth)
+
+- [x] Supabase project; Email + Google providers; JWT secret for backend
+- [x] Frontend: @supabase/supabase-js, @supabase/ssr; browser + server clients
+- [x] Sign-up page (email + password); sign-in page (email/password + Google)
+- [x] Auth callback route for OAuth (`/auth/callback`)
+- [x] Middleware: protect `/profile`, `/discover`, `/connections`; redirect to `/signin` with callbackUrl
+- [x] Backend: JWT verification (SUPABASE_JWT_SECRET), `requireAuth` middleware, `GET /api/me`, `POST /api/profile` (placeholder)
+- [x] Profile page placeholder; Next.js API proxy `/api/me` forwards token to Express
+- [x] Env examples and README updated
+
+---
+
 ## 3. Profile setup
 
-- [ ] Profile/onboarding route
+- [x] Profile/onboarding route (placeholder; gated by auth)
+- [ ] Groq drill-down and save profile (next)
 - [ ] Groq LLaMA 3.3 70B drill-down: multi-level interests (e.g. Anime → Attack on Titan)
-- [ ] Save profile → backend; Groq 20D cultural vector; index in Elasticsearch
+- [ ] Save profile → backend; Groq 20D cultural vector; index in Elasticsearch (uses `userId` from Supabase JWT)
 
 ---
 
@@ -93,4 +107,4 @@ Track implementation steps here. Update this file after every meaningful change.
 
 ---
 
-*Last updated: after adding full landing page (LandingScreen component).*
+*Last updated: after Supabase Auth (sign-up, sign-in, middleware, backend JWT, profile placeholder).*
