@@ -45,6 +45,7 @@ Track implementation steps here. Update this file after every meaningful change.
 - [ ] Your position: single glowing dot (anon, no exact location)
 - [ ] Heart markers for nearby people; darker = higher match
 - [ ] Red arc lines from you to each heart
+  - *3D animated hearts (gradient, glow, heartbeat + float keyframes); red threads same thickness for all, in overlayPane so visible.*
 - [ ] Labels: “X% wavelength”
 - [ ] Left panel: “Find your people nearby.”, live count, quote
 - [ ] Compatibility range slider (e.g. 40–95%), “Show Matches” button
@@ -93,4 +94,4 @@ Track implementation steps here. Update this file after every meaningful change.
 
 ---
 
-*Last updated: after adding full landing page (LandingScreen component).*
+*Last updated: after 3D animated hearts and visible same-thickness red threads (MapsScreen).*

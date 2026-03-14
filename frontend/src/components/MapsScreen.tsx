@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 export interface NearbyUser {
   uid: string;
-  similarity: number;      // 0–1 from backend kNN
+  similarity: number;
   lat: number;
   lng: number;
   sharedInterests: string[];
@@ -14,19 +14,17 @@ export interface NearbyUser {
 }
 
 // ─── HARDCODED CENTER (Sydney CBD) ───────────────────────────────────────────
-// TODO: replace with real geolocation when backend is ready
-const HARDCODED_CENTER = { lat: -33.8748, lng: 151.2000 };
+const HARDCODED_CENTER = { lat: -33.8688, lng: 151.2093 };
 
-// ─── HARDCODED NEARBY USERS ───────────────────────────────────────────────────
-// TODO: replace with real kNN results from backend
+// ─── HARDCODED NEARBY USERS — spread across ~2 km radius ────────────────────
 const HARDCODED_USERS: NearbyUser[] = [
-  { uid: "user-1", similarity: 0.88, lat: -33.8608, lng: 151.1981, sharedInterests: ["Radiohead", "Elden Ring", "Succession"] },
-  { uid: "user-2", similarity: 0.72, lat: -33.8748, lng: 151.1749, sharedInterests: ["Bon Iver", "Hollow Knight", "The Bear"] },
-  { uid: "user-3", similarity: 0.81, lat: -33.8548, lng: 151.2253, sharedInterests: ["Frank Ocean", "Disco Elysium", "Fleabag"] },
-  { uid: "user-4", similarity: 0.54, lat: -33.8988, lng: 151.2173, sharedInterests: ["Tame Impala", "Stardew Valley", "Atlanta"] },
-  { uid: "user-5", similarity: 0.69, lat: -33.8558, lng: 151.1943, sharedInterests: ["Mitski", "Hades", "Severance"] },
-  { uid: "user-6", similarity: 0.46, lat: -33.8938, lng: 151.1963, sharedInterests: ["James Blake", "Celeste", "Skins"] },
-  { uid: "user-7", similarity: 0.63, lat: -33.8878, lng: 151.2273, sharedInterests: ["FKA Twigs", "Outer Wilds", "Twin Peaks"] },
+  { uid: "user-1", similarity: 0.88, lat: -33.8565, lng: 151.2050, sharedInterests: ["Radiohead", "Elden Ring", "Succession"] },
+  { uid: "user-2", similarity: 0.72, lat: -33.8720, lng: 151.1900, sharedInterests: ["Bon Iver", "Hollow Knight", "The Bear"] },
+  { uid: "user-3", similarity: 0.81, lat: -33.8580, lng: 151.2240, sharedInterests: ["Frank Ocean", "Disco Elysium", "Fleabag"] },
+  { uid: "user-4", similarity: 0.10, lat: -33.8830, lng: 151.2180, sharedInterests: ["Tame Impala", "Stardew Valley", "Atlanta"] },
+  { uid: "user-5", similarity: 0.69, lat: -33.8650, lng: 151.1950, sharedInterests: ["Mitski", "Hades", "Severance"] },
+  { uid: "user-6", similarity: 0.46, lat: -33.8810, lng: 151.1980, sharedInterests: ["James Blake", "Celeste", "Skins"] },
+  { uid: "user-7", similarity: 0.63, lat: -33.8770, lng: 151.2230, sharedInterests: ["FKA Twigs", "Outer Wilds", "Twin Peaks"] },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -34,12 +32,124 @@ const HARDCODED_USERS: NearbyUser[] = [
 function similarityToColor(score: number): { fill: string; glow: string; text: string } {
   if (score >= 0.85) return { fill: "#C0392B", glow: "rgba(192,57,43,0.35)",   text: "#fff" };
   if (score >= 0.70) return { fill: "#E05B4B", glow: "rgba(224,91,75,0.30)",   text: "#fff" };
-  if (score >= 0.55) return { fill: "#EF8C7E", glow: "rgba(239,140,126,0.25)", text: "#7a1a10" };
+  if (score >= 0.55) return { fill: "#EF8C7E", glow: "rgba(239,140,126,0.25)", text: "#fff" };
   if (score >= 0.40) return { fill: "#F5B8B0", glow: "rgba(245,184,176,0.20)", text: "#9a3a30" };
   return                     { fill: "#FAD7D3", glow: "rgba(250,215,211,0.15)", text: "#b05048" };
 }
 
-const HEART_PATH = "M0,-14 C0,-14 -3,-20 -10,-20 C-18,-20 -22,-12 -22,-6 C-22,4 -14,12 0,22 C14,12 22,4 22,-6 C22,-12 18,-20 10,-20 C3,-20 0,-14 0,-14 Z";
+const HEART_SIZE_BASE = 56;
+const HEART_SIZE_MAX = 80;
+
+// ─── Heart marker ────────────────────────────────────────────────────────────
+// Uses heart-3d.png from public/. CSS filter: low % = paler, high % = brighter.
+//   Low compatibility  → very desaturated + dimmer = pale, washed-out pink
+//   High compatibility → saturated + brighter = vivid, strong red
+
+function buildCuteHeart(_fill: string, _glow: string, _textColor: string, pct: number, index: number): string {
+  const delay = (index * 0.4) % 2.8;
+  const score01 = pct / 100;
+  const size = Math.round(HEART_SIZE_BASE + score01 * (HEART_SIZE_MAX - HEART_SIZE_BASE));
+
+  const saturate = (0.1 + score01 * 1.25).toFixed(2);   // 0.1 (pale) → 1.35 (vivid)
+  const brightness = (0.82 + score01 * 0.32).toFixed(2); // 0.82 (dimmer) → 1.14 (brighter)
+
+  return `
+    <div class="wl-heart" style="
+      position:relative;
+      width:${size}px;height:${size}px;
+      cursor:pointer;
+      animation: wl-float ${2.5 + (index % 3) * 0.3}s ease-in-out ${delay}s infinite;
+    ">
+      <img
+        src="/heart-3d.png"
+        width="${size}" height="${size}"
+        draggable="false"
+        style="
+          display:block;
+          width:${size}px;height:${size}px;
+          object-fit:contain;
+          filter:
+            saturate(${saturate})
+            brightness(${brightness})
+            drop-shadow(0 3px 8px rgba(120,20,20,0.2));
+        "
+      />
+      <div style="
+        position:absolute;inset:0;
+        display:flex;align-items:center;justify-content:center;
+        padding-bottom:2px;
+        font-family:'DM Sans',system-ui,sans-serif;
+        font-size:${Math.round(size * 0.22)}px;
+        font-weight:700;
+        color:white;
+        text-shadow:0 1px 3px rgba(0,0,0,0.4);
+        pointer-events:none;
+      ">${pct}%</div>
+    </div>
+  `;
+}
+
+// ─── Inject animation keyframes once ─────────────────────────────────────────
+let stylesInjected = false;
+function injectStyles() {
+  if (stylesInjected || typeof document === "undefined") return;
+  stylesInjected = true;
+  const s = document.createElement("style");
+  s.textContent = `
+    @keyframes wl-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    .wl-heart:hover {
+      transform: scale(1.18) !important;
+      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1) !important;
+    }
+    .leaflet-marker-icon.leaflet-wavelength-heart {
+      width: ${HEART_SIZE_MAX}px !important;
+      height: ${HEART_SIZE_MAX}px !important;
+      margin-left: -${HEART_SIZE_MAX / 2}px !important;
+      margin-top: -${HEART_SIZE_MAX / 2}px !important;
+    }
+  `;
+  document.head.appendChild(s);
+}
+
+// ─── Compute thread as lat/lng points (cubic Bézier in geo-space) ────────────
+
+function computeThreadPoints(
+  fromLat: number, fromLng: number,
+  toLat: number, toLng: number,
+  index: number
+): [number, number][] {
+  const dLat = toLat - fromLat;
+  const dLng = toLng - fromLng;
+
+  const laterals = [0.30, -0.22, 0.42, -0.38, 0.18, -0.48, 0.35];
+  const sags     = [0.35, 0.28, 0.40, 0.32, 0.25, 0.38, 0.30];
+  const lateral = laterals[index % laterals.length];
+  const sag = sags[index % sags.length];
+
+  const perpLat = -dLng;
+  const perpLng = dLat;
+
+  const cp1Lat = fromLat + dLat * 0.30 + perpLat * lateral + Math.abs(dLat + dLng) * sag * 0.5;
+  const cp1Lng = fromLng + dLng * 0.30 + perpLng * lateral;
+
+  const cp2Lat = fromLat + dLat * 0.70 + perpLat * lateral * 0.4 + Math.abs(dLat + dLng) * sag * 0.25;
+  const cp2Lng = fromLng + dLng * 0.70 + perpLng * lateral * 0.4;
+
+  const pts: [number, number][] = [];
+  const N = 40;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const u = 1 - t;
+    pts.push([
+      u*u*u*fromLat + 3*u*u*t*cp1Lat + 3*u*t*t*cp2Lat + t*t*t*toLat,
+      u*u*u*fromLng + 3*u*u*t*cp1Lng + 3*u*t*t*cp2Lng + t*t*t*toLng,
+    ]);
+  }
+  return pts;
+}
 
 // ─── Profile Popup ────────────────────────────────────────────────────────────
 
@@ -139,13 +249,12 @@ function ProfilePopup({ user, onClose, onChat }: {
 export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: string) => void }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
-  const svgOverlayRef = useRef<SVGSVGElement | null>(null);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null);
 
-  // ── Load Leaflet dynamically ────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
+    injectStyles();
     if ((window as any).L) { setLeafletLoaded(true); return; }
 
     const link = document.createElement("link");
@@ -159,150 +268,97 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
     document.head.appendChild(script);
   }, []);
 
-  // ── Init map ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!leafletLoaded || !mapRef.current || mapInstanceRef.current) return;
-
     const L = (window as any).L;
 
     const map = L.map(mapRef.current, {
-        center: [HARDCODED_CENTER.lat, HARDCODED_CENTER.lng],
-        zoom: 17,
-        zoomControl: false,
-        attributionControl: false,
+      center: [HARDCODED_CENTER.lat, HARDCODED_CENTER.lng],
+      zoom: 15,
+      zoomControl: false,
+      attributionControl: false,
     });
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
+      maxZoom: 19,
     }).addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
-
     mapInstanceRef.current = map;
   }, [leafletLoaded]);
 
-  // ── Draw markers + strings ──────────────────────────────────────────────────
   const redrawMarkers = useCallback(() => {
     const L = (window as any).L;
     const map = mapInstanceRef.current;
     if (!map || !L) return;
 
-    // Clear old markers
     map.eachLayer((layer: any) => {
-      if (layer._wavelengthMarker) map.removeLayer(layer);
+      if (layer._wavelength) map.removeLayer(layer);
     });
 
-    // Clear old SVG overlay
-    if (svgOverlayRef.current) {
-      svgOverlayRef.current.remove();
-      svgOverlayRef.current = null;
-    }
-
-    // SVG overlay for red strings
-    const mapPane = map.getPanes().mapPane as HTMLElement;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:400;overflow:visible;";
-    mapPane.appendChild(svg);
-    svgOverlayRef.current = svg;
-
-    function getLayerPoint(lat: number, lng: number) {
-      return map.latLngToLayerPoint([lat, lng]);
-    }
-
-    // You-are-here teal dot
-    // TODO: swap HARDCODED_CENTER for navigator.geolocation coords when backend is ready
     const youIcon = L.divIcon({
       className: "",
       html: `<div style="
-        width:16px;height:16px;
-        background:#1abc9c;
-        border:3px solid white;
-        border-radius:50%;
-        box-shadow:0 0 0 4px rgba(26,188,156,0.25);
+        width:18px;height:18px;background:#1abc9c;
+        border:3px solid white;border-radius:50%;
+        box-shadow:0 0 0 5px rgba(26,188,156,0.2),0 0 12px rgba(26,188,156,0.3);
       "></div>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
     });
     const youMarker = L.marker([HARDCODED_CENTER.lat, HARDCODED_CENTER.lng], { icon: youIcon });
-    youMarker._wavelengthMarker = true;
+    youMarker._wavelength = true;
     youMarker.addTo(map);
 
-    // Heart markers + red strings
-    HARDCODED_USERS.forEach(user => {
+    const ring = L.circle([HARDCODED_CENTER.lat, HARDCODED_CENTER.lng], {
+      radius: 2000,
+      color: "rgba(192,57,43,0.12)",
+      weight: 1.5,
+      dashArray: "6 4",
+      fillColor: "rgba(192,57,43,0.02)",
+      fillOpacity: 1,
+      interactive: false,
+    });
+    ring._wavelength = true;
+    ring.addTo(map);
+
+    HARDCODED_USERS.forEach((user, i) => {
       const { fill, glow, text } = similarityToColor(user.similarity);
       const pct = Math.round(user.similarity * 100);
 
-      const heartIcon = L.divIcon({
-        className: "",
-        html: `
-          <div style="position:relative;width:52px;height:52px;cursor:pointer;">
-            <div style="
-              position:absolute;inset:-6px;border-radius:50%;
-              background:${glow};filter:blur(8px);
-            "></div>
-            <svg width="52" height="52" viewBox="-26 -26 52 52"
-              style="position:relative;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.15));">
-              <path d="${HEART_PATH}" fill="${fill}" />
-              <text x="0" y="5" text-anchor="middle"
-                font-family="'DM Sans',system-ui,sans-serif"
-                font-size="8" font-weight="700" fill="${text}"
-              >${pct}%</text>
-            </svg>
-          </div>
-        `,
-        iconSize: [52, 52],
-        iconAnchor: [26, 26],
+      const pts = computeThreadPoints(
+        HARDCODED_CENTER.lat, HARDCODED_CENTER.lng,
+        user.lat, user.lng, i
+      );
+      const thread = L.polyline(pts, {
+        color: "#C0392B",
+        weight: 1.5,
+        opacity: 0.35,
+        smoothFactor: 1.5,
+        lineCap: "round",
+        lineJoin: "round",
+        interactive: false,
       });
+      thread._wavelength = true;
+      thread.addTo(map);
 
-        const marker = L.marker([user.lat, user.lng], { icon: heartIcon });
-        marker._wavelengthMarker = true;
-        marker.on("click", () => setSelectedUser(user));
-        marker.addTo(map);
-
-      // Draw red string from center to heart
-        const from = getLayerPoint(HARDCODED_CENTER.lat, HARDCODED_CENTER.lng);
-        const to = getLayerPoint(user.lat, user.lng);
-
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        const cx = (from.x + to.x) / 2 - dy * 0.25;
-        const cy = (from.y + to.y) / 2 + dx * 0.25;
-
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`);
-        path.setAttribute("fill", "none");
-        path.setAttribute("stroke", "#C0392B");
-        path.setAttribute("stroke-width", "1.2");
-        path.setAttribute("stroke-opacity", String(0.3 + user.similarity * 0.4));
-        svg.appendChild(path);
+      const heartIcon = L.divIcon({
+        className: "leaflet-wavelength-heart",
+        html: buildCuteHeart(fill, glow, text, pct, i),
+        iconSize: [HEART_SIZE_MAX, HEART_SIZE_MAX],
+        iconAnchor: [HEART_SIZE_MAX / 2, HEART_SIZE_MAX / 2],
+      });
+      const marker = L.marker([user.lat, user.lng], { icon: heartIcon });
+      marker._wavelength = true;
+      marker.on("click", () => setSelectedUser(user));
+      marker.addTo(map);
     });
-
-    // Keep strings locked on pan/zoom
-    function onMoveUpdate() {
-        if (!svgOverlayRef.current) return;
-        const paths = svgOverlayRef.current.querySelectorAll("path");
-        HARDCODED_USERS.forEach((user, i) => {
-            const from = getLayerPoint(HARDCODED_CENTER.lat, HARDCODED_CENTER.lng);
-            const to = getLayerPoint(user.lat, user.lng);
-            const dx = to.x - from.x;
-            const dy = to.y - from.y;
-            const cx = (from.x + to.x) / 2 - dy * 0.25;
-            const cy = (from.y + to.y) / 2 + dx * 0.25;
-            const path = paths[i];
-            if (!path) return;
-            path.setAttribute("d", `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`);
-        });
-    }
-
-    map.on("move zoom", onMoveUpdate);
-    return () => map.off("move zoom", onMoveUpdate);
   }, []);
 
   useEffect(() => {
     if (mapInstanceRef.current && leafletLoaded) redrawMarkers();
   }, [leafletLoaded, redrawMarkers]);
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div style={{
       position: "relative", width: "100%", height: "100vh",
@@ -310,7 +366,6 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
     }}>
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
 
-      {/* Top nav */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, height: 64,
         background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)",
@@ -347,7 +402,6 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
         }}>A</div>
       </div>
 
-      {/* Bottom-left stats card */}
       <div style={{
         position: "absolute", bottom: 24, left: 20,
         background: "rgba(255,255,255,0.94)", backdropFilter: "blur(10px)",
@@ -359,8 +413,11 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#1abc9c" }} />
           <span style={{ fontSize: 13, color: "#444", fontWeight: 500 }}>You are here</span>
         </div>
-        <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>
           People nearby: <strong style={{ color: "#333" }}>{HARDCODED_USERS.length}</strong>
+        </div>
+        <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>
+          Matching radius: <strong style={{ color: "#333" }}>2 km</strong>
         </div>
         <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: "0.04em", marginBottom: 5 }}>
           COMPATIBILITY
@@ -375,7 +432,6 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
         </div>
       </div>
 
-      {/* Top-right info card */}
       <div style={{
         position: "absolute", top: 80, right: 20,
         background: "rgba(255,255,255,0.96)", backdropFilter: "blur(10px)",
@@ -401,7 +457,6 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
         }}>How it works →</button>
       </div>
 
-      {/* Profile popup on heart click */}
       {selectedUser && (
         <ProfilePopup
           user={selectedUser}
