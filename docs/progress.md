@@ -55,7 +55,8 @@ Track implementation steps here. Update this file after every meaningful change.
 
 ## 5. Discover map
 
-- [ ] Leaflet map, light/stylised base layer
+- [x] Google Maps JavaScript API: map + “You” marker for live position (optional; set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`)
+- [ ] Leaflet map option / light/stylised base layer
 - [ ] Your position: single glowing dot (anon, no exact location)
 - [ ] Heart markers for nearby people; darker = higher match
 - [ ] Red arc lines from you to each heart
@@ -68,9 +69,11 @@ Track implementation steps here. Update this file after every meaningful change.
 
 ## 6. Geolocation & real-time
 
-- [ ] navigator.geolocation (getCurrentPosition / watch), anonymised coords
+- [x] navigator.geolocation (watchPosition) via LocationContext + useLiveLocation; enable on Discover
+- [x] Backend: Socket.io `location` event; store last position per socket in memory (for future nearby query)
+- [x] Frontend: useLocationSocketSync streams live position to backend while on Discover
 - [ ] Backend: nearby query within 2 km, no exact location exposed
-- [ ] Socket.io: client sends location + UUID; server pushes match updates
+- [ ] Server pushes match updates to client
 
 ---
 
@@ -107,4 +110,4 @@ Track implementation steps here. Update this file after every meaningful change.
 
 ---
 
-*Last updated: after Supabase Auth (sign-up, sign-in, middleware, backend JWT, profile placeholder).*
+*Last updated: after adding Google Maps API for Discover map (live position marker).*
