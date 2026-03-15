@@ -40,9 +40,6 @@ type AcceptedConvo = {
   sharedInterests: string[];
 };
 
-// ─── HARDCODED CENTER (Sydney CBD) ───────────────────────────────────────────
-const HARDCODED_CENTER = { lat: -33.8688, lng: 151.2093 };
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function similarityToColor(score: number): { fill: string; glow: string; text: string } {
@@ -490,7 +487,13 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-type BackendNearbyHit = { userId: string; location?: { lat: number; lon: number }; updatedAt?: string };
+type BackendNearbyHit = {
+  userId: string;
+  location?: { lat: number; lon: number };
+  updatedAt?: string;
+  similarity?: number;
+  sharedInterests?: string[];
+};
 
 export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: string) => void }) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -501,7 +504,8 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
   const [myId, setMyId] = useState<string | null>(null);
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
   const { position } = useLiveLocation();
-  const center = position ? { lat: position.lat, lng: position.lng } : HARDCODED_CENTER;
+  // Center: live position when available; neutral fallback only until location is available
+  const center = position ? { lat: position.lat, lng: position.lng } : { lat: 0, lng: 0 };
   const displayUsers = nearbyUsers;
   const displayUsersRef = useRef<NearbyUser[]>(displayUsers);
   displayUsersRef.current = displayUsers;
@@ -569,13 +573,17 @@ export default function MapScreen({ onChatRequest }: { onChatRequest?: (uid: str
     s.emit("register", { userId: myId });
 
     s.on("nearby_users", (payload: BackendNearbyHit[]) => {
-      const users: NearbyUser[] = (payload ?? []).map((hit) => ({
-        uid: hit.userId,
-        lat: hit.location?.lat ?? 0,
-        lng: hit.location?.lon ?? 0,
-        similarity: 0.5,
-        sharedInterests: [],
-      }));
+      const users: NearbyUser[] = (payload ?? []).map((hit) => {
+        const rawScore = typeof hit.similarity === "number" ? hit.similarity : 0;
+        const similarity = Math.min(1, Math.max(0, rawScore));
+        return {
+          uid: hit.userId,
+          lat: hit.location?.lat ?? 0,
+          lng: hit.location?.lon ?? 0,
+          similarity,
+          sharedInterests: Array.isArray(hit.sharedInterests) ? hit.sharedInterests : [],
+        };
+      });
       setNearbyUsers(users);
     });
 
